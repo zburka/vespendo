@@ -8,7 +8,14 @@ import {
   SZABALYOK,
   TRANZAKCIOK,
 } from '../mock/data';
-import { alapadatok, ELO_API, tranzakciokLekeres } from '../services/api';
+import {
+  alapadatok,
+  celMentes,
+  celTorles,
+  ELO_API,
+  keretMentes,
+  tranzakciokLekeres,
+} from '../services/api';
 import { alkalmazImport } from '../services/mockImport';
 import type {
   BankiImportKeres,
@@ -39,6 +46,11 @@ interface State {
   hiba: string | null;
   /** Élő módban a szerverről (n8n) tölti be az adatokat; mock módban nem csinál semmit. */
   betoltes: () => Promise<void>;
+  /** Keret létrehozása/módosítása egy kategóriára (élő módban a szerverre is ment, majd újratölt). */
+  mentKeret: (kategoriaId: string, nev: string, haviKeret: number, aktiv: boolean) => Promise<void>;
+  /** Cél létrehozása (id nélkül) vagy módosítása. */
+  mentCel: (cel: Omit<MegtakaritasiCel, 'id'> & { id?: string }) => Promise<void>;
+  torolCel: (id: string) => Promise<void>;
   setHonap: (honap: string) => void;
   leptetHonap: (delta: number) => void;
   setSzuro: (szuro: TulajdonosSzuro) => void;
@@ -74,6 +86,56 @@ export const useStore = create<State>((set, get) => ({
         hiba: e instanceof Error ? e.message : 'Az adatok betöltése nem sikerült',
       });
     }
+  },
+  mentKeret: async (kategoriaId, nev, haviKeret, aktiv) => {
+    if (ELO_API) {
+      await keretMentes({ kategoria_id: kategoriaId, nev, havi_keret: haviKeret, aktiv });
+      await get().betoltes();
+      return;
+    }
+    set((s) => {
+      const van = s.keretek.some((k) => k.kategoria_id === kategoriaId);
+      return {
+        keretek: van
+          ? s.keretek.map((k) =>
+              k.kategoria_id === kategoriaId ? { ...k, havi_keret: haviKeret, aktiv } : k,
+            )
+          : [
+              ...s.keretek,
+              {
+                id: `keret_${kategoriaId}`,
+                kategoria_id: kategoriaId,
+                havi_keret: haviKeret,
+                aktiv,
+              },
+            ],
+      };
+    });
+  },
+  mentCel: async (cel) => {
+    if (ELO_API) {
+      await celMentes({
+        id: cel.id,
+        cel_neve: cel.cel_neve,
+        celosszeg: cel.celosszeg,
+        aktualis_osszeg: cel.aktualis_osszeg,
+      });
+      await get().betoltes();
+      return;
+    }
+    set((s) => ({
+      celok: cel.id
+        ? s.celok.map((c) => (c.id === cel.id ? { ...c, ...cel, id: c.id } : c))
+        : [...s.celok, { ...cel, id: `cel${Date.now()}` }],
+    }));
+  },
+  torolCel: async (id) => {
+    if (ELO_API) {
+      await celTorles(id);
+      await get().betoltes();
+      return;
+    }
+    set((s) => ({ celok: s.celok.filter((c) => c.id !== id) }));
   },
   setHonap: (honap) => set({ honap }),
   leptetHonap: (delta) => set((s) => ({ honap: leptetHonap(s.honap, delta) })),

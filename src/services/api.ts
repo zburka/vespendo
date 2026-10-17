@@ -111,3 +111,31 @@ export async function kategoriaModositas(body: KategoriaModositasKeres): Promise
   if (!ELO_API) return;
   await keres<unknown>('kategoria-modositas', { method: 'POST', body });
 }
+
+/** `POST /webhook/keret-mentes`: egy kategória havi keretének létrehozása vagy módosítása. Mock módban nincs teendő. */
+export async function keretMentes(body: {
+  kategoria_id: string;
+  nev: string;
+  havi_keret: number;
+  aktiv: boolean;
+}): Promise<void> {
+  if (!ELO_API) return;
+  await keres<unknown>('keret-mentes', { method: 'POST', body });
+}
+
+/** `POST /webhook/cel-mentes`: megtakarítási cél létrehozása (id nélkül) vagy módosítása. */
+export async function celMentes(body: {
+  id?: string;
+  cel_neve: string;
+  celosszeg: number;
+  aktualis_osszeg: number;
+}): Promise<void> {
+  if (!ELO_API) return;
+  await keres<unknown>('cel-mentes', { method: 'POST', body });
+}
+
+/** `POST /webhook/cel-torles` */
+export async function celTorles(id: string): Promise<void> {
+  if (!ELO_API) return;
+  await keres<unknown>('cel-torles', { method: 'POST', body: { id } });
+}
