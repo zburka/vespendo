@@ -5,10 +5,14 @@ import {
   ELOFIZETESEK,
   KATEGORIAK,
   KOLTSEGKERETEK,
+  SZABALYOK,
   TRANZAKCIOK,
 } from '../mock/data';
+import { alkalmazImport } from '../services/mockImport';
 import type {
+  BankiImportKeres,
   Elofizetes,
+  ImportOsszegzes,
   Kategoria,
   Koltsegkeret,
   MegtakaritasiCel,
@@ -32,13 +36,15 @@ interface State {
   setHonap: (honap: string) => void;
   leptetHonap: (delta: number) => void;
   setSzuro: (szuro: TulajdonosSzuro) => void;
+  /** Mock mód: a banki import n8n-logikájának helyi alkalmazása. */
+  mockBankiImport: (keres: BankiImportKeres) => ImportOsszegzes;
   hozzaadTranzakcio: (t: Omit<Tranzakcio, 'id'>) => string;
   modositTranzakcio: (id: string, valtozas: Partial<Tranzakcio>) => void;
   /** Kategóriát átállít, és a kereskedőre új szabályt generál (mock a `kategoria-modositas` végpontra). */
   modositKategoria: (id: string, ujKategoriaId: string) => void;
 }
 
-export const useStore = create<State>((set) => ({
+export const useStore = create<State>((set, get) => ({
   honap: aktualisHonap(),
   szuro: 'mind',
   kategoriak: KATEGORIAK,
@@ -46,10 +52,15 @@ export const useStore = create<State>((set) => ({
   keretek: KOLTSEGKERETEK,
   elofizetesek: ELOFIZETESEK,
   celok: CELOK,
-  szabalyok: [],
+  szabalyok: SZABALYOK,
   setHonap: (honap) => set({ honap }),
   leptetHonap: (delta) => set((s) => ({ honap: leptetHonap(s.honap, delta) })),
   setSzuro: (szuro) => set({ szuro }),
+  mockBankiImport: (keres) => {
+    const { tranzakciok, osszegzes } = alkalmazImport(get().tranzakciok, get().szabalyok, keres);
+    set({ tranzakciok });
+    return osszegzes;
+  },
   hozzaadTranzakcio: (t) => {
     const id = `rec${Date.now()}`;
     set((s) => ({ tranzakciok: [...s.tranzakciok, { ...t, id }] }));

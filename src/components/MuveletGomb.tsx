@@ -1,3 +1,4 @@
+import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -29,6 +30,16 @@ export function MuveletGomb() {
     });
   };
 
+  const bankiFajl = async () => {
+    const eredmeny = await DocumentPicker.getDocumentAsync({
+      type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel', '*/*'],
+      copyToCacheDirectory: true,
+    });
+    if (eredmeny.canceled) return;
+    const fajl = eredmeny.assets[0];
+    router.push({ pathname: '/import', params: { uri: fajl.uri, nev: fajl.name } });
+  };
+
   return (
     <Portal>
       <FAB.Group
@@ -43,6 +54,7 @@ export function MuveletGomb() {
             label: 'Nyugta a galériából',
             onPress: () => nyugtaKivalasztas('galeria'),
           },
+          { icon: 'file-table', label: 'Banki fájl tallózása', onPress: bankiFajl },
         ]}
       />
     </Portal>

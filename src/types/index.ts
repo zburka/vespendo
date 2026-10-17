@@ -66,7 +66,8 @@ export interface HaviOsszesito {
   egyenleg: number;
   bontas_tulajdonos_szerint: { kozos: number; ferj_sajat: number; feleseg_sajat: number };
   keretek: KeretAllapot[];
-  elofizetesek: ElofizetesAllapot[];
+  /** Az élő végpont csak az összeget adja; a részletes lista a mock/lokális számításból jön. */
+  elofizetesek?: ElofizetesAllapot[];
   varhato_hatralevo_elofizetesek: number;
   ai_elemzes: string;
 }
@@ -94,4 +95,30 @@ export interface NyugtaValasz {
     allapot: Allapot;
     bontott_tetelek: { kategoria: string; osszeg: number }[];
   };
+}
+
+export interface BankiTranzakcio {
+  datum: string;
+  osszeg: number;
+  kereskedo_nyers: string;
+  kozlemeny: string;
+  irany: 'kiadas' | 'bevetel';
+}
+
+export interface BankiImportKeres {
+  feltolto: Exclude<Tulajdonos, 'kozos'>;
+  tranzakciok: BankiTranzakcio[];
+}
+
+export interface ImportOsszegzes {
+  uj: number;
+  egyeztetve: number;
+  szaballyal: number;
+  ismeretlen: number;
+}
+
+export interface KategoriaModositasKeres {
+  tranzakcio_id: string;
+  uj_kategoria_id: string;
+  kereskedo_minta: string;
 }

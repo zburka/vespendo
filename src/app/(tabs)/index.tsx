@@ -1,29 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Card, ProgressBar, Text, useTheme } from 'react-native-paper';
+import { ActivityIndicator, Card, ProgressBar, Text, useTheme } from 'react-native-paper';
 
 import { HonapValaszto } from '../../components/HonapValaszto';
-import { useStore } from '../../store/useStore';
+import { useHaviOsszesito } from '../../hooks/useHaviOsszesito';
 import { formatFt, keretSzin } from '../../utils/format';
-import { szamolHaviOsszesito } from '../../utils/osszesito';
 
 export default function DashboardScreen() {
   const theme = useTheme();
-  const honap = useStore((s) => s.honap);
-  const tranzakciok = useStore((s) => s.tranzakciok);
-  const kategoriak = useStore((s) => s.kategoriak);
-  const keretek = useStore((s) => s.keretek);
-  const elofizetesek = useStore((s) => s.elofizetesek);
-
-  const o = useMemo(
-    () => szamolHaviOsszesito({ honap, tranzakciok, kategoriak, keretek, elofizetesek }),
-    [honap, tranzakciok, kategoriak, keretek, elofizetesek],
-  );
+  const { osszesito: o, hiba, betolt } = useHaviOsszesito();
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <HonapValaszto />
+      {betolt && <ActivityIndicator />}
+      {hiba && (
+        <Text variant="bodySmall" style={{ color: theme.colors.error }}>
+          Az élő adatok nem érhetők el, helyi adatokat látsz.
+        </Text>
+      )}
 
       <View style={styles.sor}>
         <OsszegKartya cim="Bevétel" ertek={o.osszes_bevetel} szin="#2e7d32" />
@@ -72,7 +67,7 @@ export default function DashboardScreen() {
           subtitle={`Várható hátralévő: ${formatFt(o.varhato_hatralevo_elofizetesek)}`}
         />
         <Card.Content style={styles.lista}>
-          {o.elofizetesek.map((e) => (
+          {(o.elofizetesek ?? []).map((e) => (
             <View key={e.id} style={styles.elofizetes}>
               <Ionicons
                 name={e.kifizetve ? 'checkmark-circle' : 'time-outline'}

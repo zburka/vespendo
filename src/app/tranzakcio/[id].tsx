@@ -1,8 +1,9 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Chip, SegmentedButtons, Text } from 'react-native-paper';
 
+import { kategoriaModositas } from '../../services/api';
 import { useStore } from '../../store/useStore';
 import type { Tulajdonos } from '../../types';
 import { formatFt, formatNap } from '../../utils/format';
@@ -31,7 +32,14 @@ export default function TranzakcioSzerkeszto() {
   const valaszthato = kategoriak.filter((k) => k.tipus === (bevetel ? 'bevetel' : 'kiadas'));
 
   const mentes = () => {
-    if (kategoriaId !== tranzakcio.kategoria_id) modositKategoria(tranzakcio.id, kategoriaId);
+    if (kategoriaId !== tranzakcio.kategoria_id) {
+      modositKategoria(tranzakcio.id, kategoriaId);
+      kategoriaModositas({
+        tranzakcio_id: tranzakcio.id,
+        uj_kategoria_id: kategoriaId,
+        kereskedo_minta: tranzakcio.kereskedo.toLowerCase(),
+      }).catch(() => Alert.alert('Szinkron', 'A szabály mentése a szerveren nem sikerült.'));
+    }
     if (tulajdonos !== tranzakcio.tulajdonos) modositTranzakcio(tranzakcio.id, { tulajdonos });
     router.back();
   };
@@ -50,7 +58,9 @@ export default function TranzakcioSzerkeszto() {
         <Text variant="bodyMedium">Megjegyzés: {tranzakcio.megjegyzes}</Text>
       ) : null}
 
-      <Text variant="titleSmall" style={styles.cim}>Kategória</Text>
+      <Text variant="titleSmall" style={styles.cim}>
+        Kategória
+      </Text>
       <View style={styles.chipek}>
         {valaszthato.map((k) => (
           <Chip
@@ -71,7 +81,9 @@ export default function TranzakcioSzerkeszto() {
         </Text>
       )}
 
-      <Text variant="titleSmall" style={styles.cim}>Tulajdonos</Text>
+      <Text variant="titleSmall" style={styles.cim}>
+        Tulajdonos
+      </Text>
       <SegmentedButtons
         value={tulajdonos}
         onValueChange={(v) => setTulajdonos(v as Tulajdonos)}

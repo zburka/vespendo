@@ -15,6 +15,7 @@ export default function RootLayout() {
             options={{ title: 'Tétel', headerBackTitle: 'Vissza' }}
           />
           <Stack.Screen name="nyugta" options={{ title: 'Nyugta rögzítése', presentation: 'modal' }} />
+          <Stack.Screen name="import" options={{ title: 'Banki import', presentation: 'modal' }} />
         </Stack>
       </PaperProvider>
     </SafeAreaProvider>

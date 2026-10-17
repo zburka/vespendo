@@ -3,6 +3,7 @@ import type {
   Kategoria,
   Koltsegkeret,
   MegtakaritasiCel,
+  Szabaly,
   Tranzakcio,
 } from '../types';
 
@@ -11,6 +12,7 @@ export const KATEGORIAK: Kategoria[] = [
   { id: 'kat_rezsi', nev: 'Rezsi', tipus: 'kiadas', ikon: 'flash' },
   { id: 'kat_szorakozas', nev: 'Szórakozás', tipus: 'kiadas', ikon: 'film' },
   { id: 'kat_ruhazat', nev: 'Ruházat', tipus: 'kiadas', ikon: 'shirt' },
+  { id: 'kat_egyeb', nev: 'Egyéb', tipus: 'kiadas', ikon: 'ellipsis-horizontal' },
   { id: 'kat_fizetes', nev: 'Fizetés', tipus: 'bevetel', ikon: 'cash' },
 ];
 
@@ -68,3 +70,12 @@ export const AI_ELEMZESEK: Record<string, string> = {
   '2026-09': 'Szeptemberben az élelmiszer kiadásaitok a keret alatt maradtak, a megtakarítási célokhoz bőven jutott pénz.',
   '2026-10': 'Ebben a hónapban a rezsi keretetek majdnem elérte a maximumot. Az élelmiszer költéseitek a megszokott ütemben alakulnak, a közös megtakarítási célhoz további 100 000 Ft félretehető.',
 };
+
+/** A `szabalymotor` tábla induló tartalma (0 tokenes kategorizálás). */
+export const SZABALYOK: Szabaly[] = [
+  { id: 'sz1', minta: 'lidl', kategoria_id: 'kat_elelmiszer', alapertelmezett_tulajdonos: 'kozos' },
+  { id: 'sz2', minta: 'spar', kategoria_id: 'kat_elelmiszer', alapertelmezett_tulajdonos: 'kozos' },
+  { id: 'sz3', minta: 'mvm', kategoria_id: 'kat_rezsi', alapertelmezett_tulajdonos: 'kozos' },
+  { id: 'sz4', minta: 'telekom', kategoria_id: 'kat_rezsi', alapertelmezett_tulajdonos: 'kozos' },
+  { id: 'sz5', minta: 'netflix', kategoria_id: 'kat_szorakozas', alapertelmezett_tulajdonos: 'kozos' },
+];

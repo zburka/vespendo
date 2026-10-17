@@ -10,7 +10,7 @@ import {
   TextInput,
 } from 'react-native-paper';
 
-import { feltoltNyugta } from '../services/nyugtaApi';
+import { feltoltNyugta } from '../services/api';
 import { tomorit } from '../services/kepTomorites';
 import { useStore } from '../store/useStore';
 import type { NyugtaValasz } from '../types';
