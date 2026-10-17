@@ -18,6 +18,7 @@ python3 wf_nyugta.py            # POST /webhook/nyugta-feltoltes  (AI hitelesít
 python3 wf_gyors_import.py      # POST /webhook/banki-fajl-gyors-import  (elemzés + import egy hívásban, iOS Parancsok)
 python3 wf_keretek.py           # POST /webhook/keret-mentes, /cel-mentes, /cel-torles
 python3 wf_felvetel.py          # POST /webhook/tranzakcio-felvetel (kézi tétel)
+python3 wf_szerkesztok.py       # POST /webhook/elofizetes-mentes, /elofizetes-torles, /tranzakcio-modositas, /tranzakcio-torles
 ```
 
 A webhookok `X-App-Key` fejlécet várnak. A Haiku / Sonnet lépések akkor épülnek be, ha az n8n-ben létezik a

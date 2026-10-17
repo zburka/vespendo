@@ -162,3 +162,40 @@ export async function ujTranzakcio(body: UjTranzakcioKeres): Promise<void> {
   if (!ELO_API) return;
   await keres<unknown>('tranzakcio-felvetel', { method: 'POST', body });
 }
+
+/** `POST /webhook/elofizetes-mentes`: létrehozás (id nélkül) vagy módosítás. */
+export async function elofizetesMentes(body: {
+  id?: string;
+  megnevezes: string;
+  varhato_osszeg: number;
+  esedekesseg_napja: number;
+  kategoria_id: string;
+}): Promise<void> {
+  if (!ELO_API) return;
+  await keres<unknown>('elofizetes-mentes', { method: 'POST', body });
+}
+
+/** `POST /webhook/elofizetes-torles` */
+export async function elofizetesTorles(id: string): Promise<void> {
+  if (!ELO_API) return;
+  await keres<unknown>('elofizetes-torles', { method: 'POST', body: { id } });
+}
+
+/** `POST /webhook/tranzakcio-modositas`: név, összeg, dátum, megjegyzés, fizetési mód módosítása. */
+export async function tranzakcioModositas(body: {
+  id: string;
+  kereskedo?: string;
+  osszeg?: number;
+  datum?: string;
+  megjegyzes?: string;
+  fizetesi_mod?: string;
+}): Promise<void> {
+  if (!ELO_API) return;
+  await keres<unknown>('tranzakcio-modositas', { method: 'POST', body });
+}
+
+/** `POST /webhook/tranzakcio-torles` */
+export async function tranzakcioTorles(id: string): Promise<void> {
+  if (!ELO_API) return;
+  await keres<unknown>('tranzakcio-torles', { method: 'POST', body: { id } });
+}

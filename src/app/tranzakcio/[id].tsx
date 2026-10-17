@@ -1,23 +1,32 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Chip, SegmentedButtons, Text } from 'react-native-paper';
+import { Button, Chip, SegmentedButtons, Text, TextInput, useTheme } from 'react-native-paper';
 
-import { kategoriaModositas } from '../../services/api';
+import { kategoriaModositas, tranzakcioModositas, tranzakcioTorles } from '../../services/api';
 import { useStore } from '../../store/useStore';
-import type { Tulajdonos } from '../../types';
-import { formatFt, formatNap } from '../../utils/format';
+import type { FizetesiMod, Tulajdonos } from '../../types';
+import { formatFt } from '../../utils/format';
+import { kereskedoKulcs } from '../../utils/kereskedo';
 
 export default function TranzakcioSzerkeszto() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const theme = useTheme();
   const tranzakcio = useStore((s) => s.tranzakciok.find((t) => t.id === id));
   const kategoriak = useStore((s) => s.kategoriak);
   const modositTranzakcio = useStore((s) => s.modositTranzakcio);
   const modositKategoria = useStore((s) => s.modositKategoria);
+  const torolTranzakcioLokal = useStore((s) => s.torolTranzakcioLokal);
 
+  const [nev, setNev] = useState(tranzakcio?.kereskedo ?? '');
+  const [osszeg, setOsszeg] = useState(tranzakcio ? String(tranzakcio.osszeg) : '');
+  const [datum, setDatum] = useState(tranzakcio?.datum ?? '');
+  const [megjegyzes, setMegjegyzes] = useState(tranzakcio?.megjegyzes ?? '');
+  const [mod, setMod] = useState<FizetesiMod>(tranzakcio?.fizetesi_mod ?? 'kartya');
   const [kategoriaId, setKategoriaId] = useState(tranzakcio?.kategoria_id ?? '');
   const [tulajdonos, setTulajdonos] = useState<Tulajdonos>(tranzakcio?.tulajdonos ?? 'kozos');
+  const [mentes, setMentes] = useState(false);
 
   if (!tranzakcio) {
     return (
@@ -30,40 +39,120 @@ export default function TranzakcioSzerkeszto() {
 
   const bevetel = tranzakcio.tipus !== 'kiadas';
   const valaszthato = kategoriak.filter((k) => k.tipus === (bevetel ? 'bevetel' : 'kiadas'));
+  const minta =
+    kereskedoKulcs(tranzakcio.kereskedo) ?? tranzakcio.kereskedo.toLowerCase().slice(0, 60);
 
-  const mentes = () => {
+  const ment = async () => {
+    const ertek = Number(osszeg.replace(/[\s ]/g, '').replace(',', '.'));
+    if (!nev.trim()) return Alert.alert('Hiba', 'A megnevezés nem lehet üres.');
+    if (!isFinite(ertek) || ertek <= 0)
+      return Alert.alert('Hiba', 'Az összeg legyen pozitív szám.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(datum) || isNaN(Date.parse(datum))) {
+      return Alert.alert('Hiba', 'A dátum formátuma: ÉÉÉÉ-HH-NN');
+    }
+
+    const reszletek = {
+      ...(nev.trim() !== tranzakcio.kereskedo && { kereskedo: nev.trim() }),
+      ...(ertek !== tranzakcio.osszeg && { osszeg: ertek }),
+      ...(datum !== tranzakcio.datum && { datum }),
+      ...(megjegyzes !== (tranzakcio.megjegyzes ?? '') && { megjegyzes }),
+      ...(mod !== tranzakcio.fizetesi_mod && { fizetesi_mod: mod }),
+    };
     const katValtozott = kategoriaId !== tranzakcio.kategoria_id;
     const tulValtozott = tulajdonos !== tranzakcio.tulajdonos;
-    if (!katValtozott && !tulValtozott) {
+    if (!Object.keys(reszletek).length && !katValtozott && !tulValtozott) return router.back();
+
+    setMentes(true);
+    try {
+      if (Object.keys(reszletek).length) {
+        await tranzakcioModositas({ id: tranzakcio.id, ...reszletek });
+      }
+      if (katValtozott || tulValtozott) {
+        await kategoriaModositas({
+          tranzakcio_id: tranzakcio.id,
+          ...(katValtozott && { uj_kategoria_id: kategoriaId, kereskedo_minta: minta }),
+          ...(tulValtozott && { uj_tulajdonos: tulajdonos }),
+        });
+      }
+      // helyi állapot (a szerver már elfogadta)
+      if (Object.keys(reszletek).length) modositTranzakcio(tranzakcio.id, reszletek);
+      if (katValtozott) modositKategoria(tranzakcio.id, kategoriaId);
+      if (tulValtozott) modositTranzakcio(tranzakcio.id, { tulajdonos });
       router.back();
-      return;
+    } catch (e) {
+      setMentes(false);
+      Alert.alert('Mentés', e instanceof Error ? e.message : 'A mentés nem sikerült.');
     }
-    if (katValtozott) modositKategoria(tranzakcio.id, kategoriaId);
-    if (tulValtozott) modositTranzakcio(tranzakcio.id, { tulajdonos });
-    kategoriaModositas({
-      tranzakcio_id: tranzakcio.id,
-      ...(katValtozott && {
-        uj_kategoria_id: kategoriaId,
-        kereskedo_minta: tranzakcio.kereskedo.toLowerCase(),
-      }),
-      ...(tulValtozott && { uj_tulajdonos: tulajdonos }),
-    }).catch(() => Alert.alert('Szinkron', 'A módosítás mentése a szerveren nem sikerült.'));
-    router.back();
   };
 
+  const torol = () =>
+    Alert.alert(
+      'Tétel törlése',
+      `Biztosan törlöd: ${tranzakcio.kereskedo}?` +
+        (tranzakcio.forras === 'bank_import'
+          ? '\n\nFigyelem: ha ugyanazt a kivonatot újra betöltöd, a tétel visszakerülhet.'
+          : ''),
+      [
+        { text: 'Mégse', style: 'cancel' },
+        {
+          text: 'Törlés',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await tranzakcioTorles(tranzakcio.id);
+              torolTranzakcioLokal(tranzakcio.id);
+              router.back();
+            } catch (e) {
+              Alert.alert('Törlés', e instanceof Error ? e.message : 'A törlés nem sikerült.');
+            }
+          },
+        },
+      ],
+    );
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Stack.Screen options={{ title: tranzakcio.kereskedo }} />
-      <Text variant="headlineMedium">
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <Stack.Screen options={{ title: 'Tétel szerkesztése' }} />
+      <Text variant="headlineSmall">
         {bevetel ? '+' : '−'}
-        {formatFt(tranzakcio.osszeg)}
+        {formatFt(Number(osszeg.replace(/[\s ]/g, '').replace(',', '.')) || 0)}
       </Text>
-      <Text variant="bodyMedium">
-        {formatNap(tranzakcio.datum)} · {tranzakcio.fizetesi_mod}
+
+      <TextInput mode="outlined" label="Megnevezés" value={nev} onChangeText={setNev} />
+      <TextInput
+        mode="outlined"
+        label="Összeg (Ft)"
+        keyboardType="numeric"
+        value={osszeg}
+        onChangeText={setOsszeg}
+      />
+      <TextInput
+        mode="outlined"
+        label="Dátum (ÉÉÉÉ-HH-NN)"
+        value={datum}
+        onChangeText={setDatum}
+        autoCapitalize="none"
+      />
+      <TextInput
+        mode="outlined"
+        label="Megjegyzés"
+        value={megjegyzes}
+        onChangeText={setMegjegyzes}
+        multiline
+      />
+
+      <Text variant="titleSmall" style={styles.cim}>
+        Fizetési mód
       </Text>
-      {tranzakcio.megjegyzes ? (
-        <Text variant="bodyMedium">Megjegyzés: {tranzakcio.megjegyzes}</Text>
-      ) : null}
+      <SegmentedButtons
+        value={mod}
+        onValueChange={(v) => setMod(v as FizetesiMod)}
+        buttons={[
+          { value: 'kartya', label: 'Kártya' },
+          { value: 'keszpenz', label: 'Készpénz' },
+          { value: 'atutalas', label: 'Átutalás' },
+        ]}
+      />
 
       <Text variant="titleSmall" style={styles.cim}>
         Kategória
@@ -83,8 +172,7 @@ export default function TranzakcioSzerkeszto() {
       </View>
       {kategoriaId !== tranzakcio.kategoria_id && (
         <Text variant="bodySmall">
-          Mentéskor szabály jön létre: „{tranzakcio.kereskedo.toLowerCase()}” a jövőben ebbe a
-          kategóriába kerül.
+          Mentéskor szabály jön létre: „{minta}” a jövőben ebbe a kategóriába kerül.
         </Text>
       )}
 
@@ -101,8 +189,17 @@ export default function TranzakcioSzerkeszto() {
         ]}
       />
 
-      <Button mode="contained" onPress={mentes} style={styles.gomb}>
+      <Button
+        mode="contained"
+        onPress={ment}
+        loading={mentes}
+        disabled={mentes}
+        style={styles.gomb}
+      >
         Mentés
+      </Button>
+      <Button textColor={theme.colors.error} onPress={torol} disabled={mentes}>
+        Tétel törlése
       </Button>
     </ScrollView>
   );

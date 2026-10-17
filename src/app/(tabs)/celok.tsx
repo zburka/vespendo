@@ -3,6 +3,7 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Button,
   Card,
+  Chip,
   Dialog,
   Divider,
   List,
@@ -16,11 +17,14 @@ import {
 
 import { AdatAllapot } from '../../components/AdatAllapot';
 import { useStore } from '../../store/useStore';
-import type { Kategoria, MegtakaritasiCel } from '../../types';
+import type { Elofizetes, Kategoria, MegtakaritasiCel } from '../../types';
 import { formatFt } from '../../utils/format';
 
 type Szerkesztes =
-  { tipus: 'cel'; cel?: MegtakaritasiCel } | { tipus: 'keret'; kategoria: Kategoria } | null;
+  | { tipus: 'cel'; cel?: MegtakaritasiCel }
+  | { tipus: 'keret'; kategoria: Kategoria }
+  | { tipus: 'elofizetes'; ef?: Elofizetes }
+  | null;
 
 /** '12 000', '12000,5' -> szám; érvénytelen esetén NaN */
 const szam = (s: string) => Number(s.replace(/[\s ]/g, '').replace(',', '.'));
@@ -33,12 +37,17 @@ export default function CelokScreen() {
   const mentKeret = useStore((s) => s.mentKeret);
   const mentCel = useStore((s) => s.mentCel);
   const torolCel = useStore((s) => s.torolCel);
+  const elofizetesek = useStore((s) => s.elofizetesek);
+  const mentElofizetes = useStore((s) => s.mentElofizetes);
+  const torolElofizetes = useStore((s) => s.torolElofizetes);
 
   const [szerkesztes, setSzerkesztes] = useState<Szerkesztes>(null);
   const [nev, setNev] = useState('');
   const [osszeg, setOsszeg] = useState('');
   const [aktualis, setAktualis] = useState('');
   const [aktiv, setAktiv] = useState(true);
+  const [nap, setNap] = useState('');
+  const [efKategoria, setEfKategoria] = useState('');
   const [mentes, setMentes] = useState(false);
 
   const kiadasKategoriak = kategoriak.filter((k) => k.tipus === 'kiadas');
@@ -48,6 +57,18 @@ export default function CelokScreen() {
     setOsszeg(cel ? String(cel.celosszeg) : '');
     setAktualis(cel ? String(cel.aktualis_osszeg) : '0');
     setSzerkesztes({ tipus: 'cel', cel });
+  };
+  const megnyitEf = (ef?: Elofizetes) => {
+    setNev(ef?.megnevezes ?? '');
+    setOsszeg(ef ? String(ef.varhato_osszeg) : '');
+    setNap(ef ? String(ef.esedekesseg_napja) : '1');
+    setEfKategoria(
+      ef?.kategoria_id ??
+        kategoriak.find((k) => k.nev === 'Előfizetés')?.id ??
+        kiadasKategoriak[0]?.id ??
+        '',
+    );
+    setSzerkesztes({ tipus: 'elofizetes', ef });
   };
   const megnyitKeret = (kategoria: Kategoria) => {
     const keret = keretek.find((k) => k.kategoria_id === kategoria.id);
@@ -66,6 +87,22 @@ export default function CelokScreen() {
         if (!isFinite(ertek) || ertek < 0) return Alert.alert('Hiba', 'Adj meg érvényes összeget.');
         setMentes(true);
         await mentKeret(szerkesztes.kategoria.id, szerkesztes.kategoria.nev, ertek, aktiv);
+      } else if (szerkesztes.tipus === 'elofizetes') {
+        const napSzam = Number(nap);
+        if (!nev.trim()) return Alert.alert('Hiba', 'Add meg az előfizetés nevét.');
+        if (!isFinite(ertek) || ertek <= 0) return Alert.alert('Hiba', 'Az összeg legyen pozitív.');
+        if (!Number.isInteger(napSzam) || napSzam < 1 || napSzam > 31) {
+          return Alert.alert('Hiba', 'Az esedékesség napja 1 és 31 közötti szám legyen.');
+        }
+        if (!efKategoria) return Alert.alert('Hiba', 'Válassz kategóriát.');
+        setMentes(true);
+        await mentElofizetes({
+          id: szerkesztes.ef?.id,
+          megnevezes: nev.trim(),
+          varhato_osszeg: ertek,
+          esedekesseg_napja: napSzam,
+          kategoria_id: efKategoria,
+        });
       } else {
         const akt = szam(aktualis);
         if (!nev.trim()) return Alert.alert('Hiba', 'Add meg a cél nevét.');
@@ -87,6 +124,19 @@ export default function CelokScreen() {
       Alert.alert('Mentés', e instanceof Error ? e.message : 'A mentés nem sikerült.');
     }
   };
+
+  const torolEf = (ef: Elofizetes) =>
+    Alert.alert('Előfizetés törlése', `Biztosan törlöd: ${ef.megnevezes}?`, [
+      { text: 'Mégse', style: 'cancel' },
+      {
+        text: 'Törlés',
+        style: 'destructive',
+        onPress: () =>
+          torolElofizetes(ef.id).catch((e) =>
+            Alert.alert('Törlés', e instanceof Error ? e.message : 'A törlés nem sikerült.'),
+          ),
+      },
+    ]);
 
   const torol = (cel: MegtakaritasiCel) =>
     Alert.alert('Cél törlése', `Biztosan törlöd: ${cel.cel_neve}?`, [
@@ -133,6 +183,28 @@ export default function CelokScreen() {
         );
       })}
 
+      <View style={[styles.fejlec, styles.szekcio]}>
+        <Text variant="titleLarge">Fix előfizetések</Text>
+        <Button icon="plus" mode="text" onPress={() => megnyitEf()}>
+          Új előfizetés
+        </Button>
+      </View>
+      {elofizetesek.length === 0 && <Text variant="bodyMedium">Még nincs előfizetés felvéve.</Text>}
+      {elofizetesek.map((ef) => (
+        <Card key={ef.id}>
+          <Card.Title
+            title={ef.megnevezes}
+            subtitle={`${formatFt(ef.varhato_osszeg)} · minden hónap ${ef.esedekesseg_napja}. napján`}
+          />
+          <Card.Actions>
+            <Button onPress={() => torolEf(ef)} textColor={theme.colors.error}>
+              Törlés
+            </Button>
+            <Button onPress={() => megnyitEf(ef)}>Szerkesztés</Button>
+          </Card.Actions>
+        </Card>
+      ))}
+
       <Text variant="titleLarge" style={styles.szekcio}>
         Költségkeretek
       </Text>
@@ -162,17 +234,30 @@ export default function CelokScreen() {
           <Dialog.Title>
             {szerkesztes?.tipus === 'keret'
               ? `Keret: ${szerkesztes.kategoria.nev}`
-              : szerkesztes?.cel
-                ? 'Cél szerkesztése'
-                : 'Új cél'}
+              : szerkesztes?.tipus === 'elofizetes'
+                ? szerkesztes.ef
+                  ? 'Előfizetés szerkesztése'
+                  : 'Új előfizetés'
+                : szerkesztes?.cel
+                  ? 'Cél szerkesztése'
+                  : 'Új cél'}
           </Dialog.Title>
           <Dialog.Content style={styles.dialogus}>
             {szerkesztes?.tipus === 'cel' && (
               <TextInput mode="outlined" label="Cél neve" value={nev} onChangeText={setNev} />
             )}
+            {szerkesztes?.tipus === 'elofizetes' && (
+              <TextInput mode="outlined" label="Megnevezés" value={nev} onChangeText={setNev} />
+            )}
             <TextInput
               mode="outlined"
-              label={szerkesztes?.tipus === 'keret' ? 'Havi keret (Ft)' : 'Célösszeg (Ft)'}
+              label={
+                szerkesztes?.tipus === 'keret'
+                  ? 'Havi keret (Ft)'
+                  : szerkesztes?.tipus === 'elofizetes'
+                    ? 'Havi összeg (Ft)'
+                    : 'Célösszeg (Ft)'
+              }
               keyboardType="numeric"
               value={osszeg}
               onChangeText={setOsszeg}
@@ -185,6 +270,29 @@ export default function CelokScreen() {
                 value={aktualis}
                 onChangeText={setAktualis}
               />
+            )}
+            {szerkesztes?.tipus === 'elofizetes' && (
+              <>
+                <TextInput
+                  mode="outlined"
+                  label="Esedékesség napja (1–31)"
+                  keyboardType="numeric"
+                  value={nap}
+                  onChangeText={setNap}
+                />
+                <View style={styles.chipek}>
+                  {kiadasKategoriak.map((k) => (
+                    <Chip
+                      key={k.id}
+                      selected={k.id === efKategoria}
+                      showSelectedOverlay
+                      onPress={() => setEfKategoria(k.id)}
+                    >
+                      {k.nev}
+                    </Chip>
+                  ))}
+                </View>
+              </>
             )}
             {szerkesztes?.tipus === 'keret' && (
               <View style={styles.kapcsolo}>
@@ -214,5 +322,6 @@ const styles = StyleSheet.create({
   kartyaTartalom: { gap: 8 },
   sav: { height: 10, borderRadius: 5 },
   dialogus: { gap: 12 },
+  chipek: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   kapcsolo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

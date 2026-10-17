@@ -72,6 +72,33 @@ export default function DashboardScreen() {
       </Card>
 
       <Card>
+        <Card.Title title="Kiadások tulajdonos szerint" />
+        <Card.Content style={styles.lista}>
+          {(
+            [
+              ['Közös', 'kozos'],
+              ['Férj', 'ferj_sajat'],
+              ['Feleség', 'feleseg_sajat'],
+            ] as const
+          ).map(([cimke, kulcs]) => {
+            const ertek = o.bontas_tulajdonos_szerint[kulcs];
+            return (
+              <View key={kulcs} style={styles.keret}>
+                <View style={styles.keretFejlec}>
+                  <Text variant="bodyLarge">{cimke}</Text>
+                  <Text variant="bodySmall">{formatFt(ertek)}</Text>
+                </View>
+                <ProgressBar
+                  progress={o.osszes_kiadas > 0 ? ertek / o.osszes_kiadas : 0}
+                  style={styles.sav}
+                />
+              </View>
+            );
+          })}
+        </Card.Content>
+      </Card>
+
+      <Card>
         <Card.Title
           title="AI pénzügyi elemzés"
           left={(p) => <Ionicons name="sparkles" size={p.size} color={theme.colors.primary} />}

@@ -5,8 +5,9 @@ import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { KulcsPrompt } from '../components/KulcsPrompt';
+import { SzerepPrompt } from '../components/SzerepPrompt';
 import { ELO_API, setAppKulcs, vanAppKulcs } from '../services/api';
-import { kulcsOlvas } from '../services/kulcs';
+import { kulcsOlvas, szerepOlvas } from '../services/kulcs';
 import { useStore } from '../store/useStore';
 
 export default function RootLayout() {
@@ -18,6 +19,13 @@ export default function RootLayout() {
         if (tarolt) setAppKulcs(tarolt);
       } catch {
         // a tároló nem érhető el: az app bekéri a kulcsot
+      }
+      try {
+        const szerep = await szerepOlvas();
+        if (szerep) await useStore.getState().setSzerep(szerep);
+        else useStore.getState().setSzerepSzukseges(true);
+      } catch {
+        useStore.getState().setSzerepSzukseges(true);
       }
       if (!vanAppKulcs()) {
         useStore.getState().setKulcsSzukseges(true);
@@ -32,6 +40,7 @@ export default function RootLayout() {
       <PaperProvider>
         <StatusBar style="auto" />
         <KulcsPrompt />
+        <SzerepPrompt />
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen

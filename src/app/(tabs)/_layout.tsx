@@ -41,6 +41,15 @@ export default function TabLayout() {
             ),
           }}
         />
+        <Tabs.Screen
+          name="beallitasok"
+          options={{
+            title: 'Beállítások',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="settings" size={size} color={color as string} />
+            ),
+          }}
+        />
       </Tabs>
       <MuveletGomb />
     </>

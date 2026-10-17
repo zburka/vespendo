@@ -13,10 +13,13 @@ import {
   celMentes,
   celTorles,
   ELO_API,
+  elofizetesMentes,
+  elofizetesTorles,
   HibasKulcs,
   keretMentes,
   tranzakciokLekeres,
 } from '../services/api';
+import { szerepMent, type Szerep } from '../services/kulcs';
 import { alkalmazImport } from '../services/mockImport';
 import type {
   BankiImportKeres,
@@ -30,6 +33,7 @@ import type {
   Tulajdonos,
 } from '../types';
 import { aktualisHonap, leptetHonap } from '../utils/format';
+import { kereskedoKulcs } from '../utils/kereskedo';
 
 let elsoBetoltes = true;
 
@@ -57,6 +61,15 @@ interface State {
   /** Cél létrehozása (id nélkül) vagy módosítása. */
   mentCel: (cel: Omit<MegtakaritasiCel, 'id'> & { id?: string }) => Promise<void>;
   torolCel: (id: string) => Promise<void>;
+  /** Ki használja ezt a telefont; az importoknál ez az alapértelmezett feltöltő. */
+  szerep: Szerep | null;
+  szerepSzukseges: boolean;
+  setSzerep: (szerep: Szerep) => Promise<void>;
+  setSzerepSzukseges: (ertek: boolean) => void;
+  mentElofizetes: (e: Omit<Elofizetes, 'id'> & { id?: string }) => Promise<void>;
+  torolElofizetes: (id: string) => Promise<void>;
+  /** Helyi állapotból törli a tételt (a szerveroldali törlés külön hívás). */
+  torolTranzakcioLokal: (id: string) => void;
   setHonap: (honap: string) => void;
   leptetHonap: (delta: number) => void;
   setSzuro: (szuro: TulajdonosSzuro) => void;
@@ -158,6 +171,45 @@ export const useStore = create<State>((set, get) => ({
     }
     set((s) => ({ celok: s.celok.filter((c) => c.id !== id) }));
   },
+  szerep: null,
+  szerepSzukseges: false,
+  setSzerep: async (szerep) => {
+    set({ szerep, szerepSzukseges: false });
+    try {
+      await szerepMent(szerep);
+    } catch {
+      // a tároló nem érhető el: a beállítás csak az aktuális munkamenetre él
+    }
+  },
+  setSzerepSzukseges: (szerepSzukseges) => set({ szerepSzukseges }),
+  mentElofizetes: async (e) => {
+    if (ELO_API) {
+      await elofizetesMentes({
+        id: e.id,
+        megnevezes: e.megnevezes,
+        varhato_osszeg: e.varhato_osszeg,
+        esedekesseg_napja: e.esedekesseg_napja,
+        kategoria_id: e.kategoria_id,
+      });
+      await get().betoltes();
+      return;
+    }
+    set((s) => ({
+      elofizetesek: e.id
+        ? s.elofizetesek.map((x) => (x.id === e.id ? { ...x, ...e, id: x.id } : x))
+        : [...s.elofizetesek, { ...e, id: `ef${Date.now()}` }],
+    }));
+  },
+  torolElofizetes: async (id) => {
+    if (ELO_API) {
+      await elofizetesTorles(id);
+      await get().betoltes();
+      return;
+    }
+    set((s) => ({ elofizetesek: s.elofizetesek.filter((x) => x.id !== id) }));
+  },
+  torolTranzakcioLokal: (id) =>
+    set((s) => ({ tranzakciok: s.tranzakciok.filter((t) => t.id !== id) })),
   setHonap: (honap) => set({ honap }),
   leptetHonap: (delta) => set((s) => ({ honap: leptetHonap(s.honap, delta) })),
   setSzuro: (szuro) => set({ szuro }),
@@ -179,7 +231,7 @@ export const useStore = create<State>((set, get) => ({
     set((s) => {
       const t = s.tranzakciok.find((x) => x.id === id);
       if (!t) return s;
-      const minta = t.kereskedo.toLowerCase();
+      const minta = kereskedoKulcs(t.kereskedo) ?? t.kereskedo.toLowerCase().slice(0, 60);
       return {
         tranzakciok: s.tranzakciok.map((x) =>
           x.id === id ? { ...x, kategoria_id: ujKategoriaId } : x,
