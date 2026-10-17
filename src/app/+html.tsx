@@ -20,6 +20,12 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="apple-mobile-web-app-title" content="VeSpendo" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="theme-color" content="#6750a4" />
+        <meta name="color-scheme" content="light" />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: ':root{color-scheme:light}html,body{background-color:#fff;color:#1c1b1f}',
+          }}
+        />
         <ScrollViewStyleReset />
       </head>
       <body>{children}</body>

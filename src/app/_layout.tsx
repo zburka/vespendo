@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { PaperProvider } from 'react-native-paper';
+import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { KulcsPrompt } from '../components/KulcsPrompt';
@@ -38,8 +38,9 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <PaperProvider>
-        <StatusBar style="auto" />
+      {/* fix világos téma: a Paper alapból a rendszer színsémáját követné, ami weben (sötét mód) felemás felületet adott */}
+      <PaperProvider theme={MD3LightTheme}>
+        <StatusBar style="dark" />
         <KulcsPrompt />
         <SzerepPrompt />
         <Stack>
