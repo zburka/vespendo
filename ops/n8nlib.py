@@ -48,6 +48,8 @@ def http(nev, metodus, url, poz, body=None, creds=None, fejlec=None, lapozas=Fal
         p['options']['response'] = {'response': {'neverError': True, 'fullResponse': teljes}}
     extra = {'retryOnFail': True, 'maxTries': 2, 'waitBetweenTries': 1000} if retry else {}
     if hiba_ag: extra['onError'] = 'continueErrorOutput'
+    # az oldalakra bontott lekérés (több kimeneti elem) csak egyszer fusson, különben a következő lépések lapokként ismétlődnek
+    if lapozas: extra['executeOnce'] = True
     return node(nev, 'n8n-nodes-base.httpRequest', 4.2, p, poz, creds, **extra)
 
 def code(nev, js, poz, mod='runOnceForAllItems', hiba_ag=False):
