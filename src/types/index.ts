@@ -1,4 +1,5 @@
-export type KategoriaTipus = 'kiadas' | 'bevetel';
+/** 'atvezetes': belső átvezetés, se kiadás, se bevétel (kimarad az összesítésekből). */
+export type KategoriaTipus = 'kiadas' | 'bevetel' | 'atvezetes';
 export type TranzakcioTipus = 'kiadas' | 'bevetel_rendszeres' | 'bevetel_egyszeri';
 /** A személy kulcsa (a szemelyek tábla kulcsa): 'kozos', 'ferj', 'feleseg' vagy bármely felvett személy. */
 export type Tulajdonos = string;

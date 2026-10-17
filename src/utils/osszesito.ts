@@ -11,7 +11,11 @@ interface Bemenet {
 
 /** A `GET /webhook/havi-osszesito` válaszát utánzó, kliensoldali számítás (mock réteg). */
 export function szamolHaviOsszesito(b: Bemenet): HaviOsszesito {
-  const havi = b.tranzakciok.filter((t) => t.datum.startsWith(b.honap));
+  // a belső átvezetés (se kiadás, se bevétel) kimarad az összesítésekből
+  const atvezetes = new Set(b.kategoriak.filter((k) => k.tipus === 'atvezetes').map((k) => k.id));
+  const havi = b.tranzakciok.filter(
+    (t) => t.datum.startsWith(b.honap) && !atvezetes.has(t.kategoria_id),
+  );
   const kiadasok = havi.filter((t) => t.tipus === 'kiadas');
   const sum = (l: Tranzakcio[]) => l.reduce((s, t) => s + t.osszeg, 0);
 

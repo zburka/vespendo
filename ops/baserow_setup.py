@@ -38,7 +38,11 @@ def valaszto(*ertekek):
 SZAM = dict(number_decimal_places=2, number_negative=False)
 
 kat = tabla('kategoriak', 'nev')
-mezo(kat, 'tipus', 'single_select', **valaszto('kiadas', 'bevetel'))
+mezo(kat, 'tipus', 'single_select', **valaszto('kiadas', 'bevetel', 'atvezetes'))
+# meglévő telepítés: az 'atvezetes' típus (belső átvezetés: se kiadás, se bevétel) hozzáadása
+_tip = mezok(kat)['tipus']
+if 'atvezetes' not in [o['value'] for o in _tip['select_options']]:
+    api('PATCH', f"/api/database/fields/{_tip['id']}/", {'select_options': [{'id': o['id'], 'value': o['value'], 'color': o['color']} for o in _tip['select_options']] + [{'value': 'atvezetes', 'color': 'light-gray'}]})
 mezo(kat, 'ikon', 'text')
 
 tr = tabla('tranzakciok', 'kereskedo')
@@ -91,7 +95,8 @@ def sorok(tid, items):
     return api('POST', f'/api/database/rows/table/{tid}/batch/?user_field_names=true', {'items': items})['items']
 
 KATEGORIAK = [('Élelmiszer', 'kiadas', 'cart'), ('Rezsi', 'kiadas', 'flash'), ('Szórakozás', 'kiadas', 'film'),
-              ('Ruházat', 'kiadas', 'shirt'), ('Étterem', 'kiadas', 'silverware-fork-knife'), ('Közlekedés', 'kiadas', 'car'), ('Egészség', 'kiadas', 'heart-pulse'), ('Előfizetés', 'kiadas', 'calendar-sync'), ('Banki költségek', 'kiadas', 'bank'),
+              ('Ruházat', 'kiadas', 'shirt'), ('Étterem', 'kiadas', 'silverware-fork-knife'), ('Közlekedés', 'kiadas', 'car'), ('Egészség', 'kiadas', 'heart-pulse'), ('Előfizetés', 'kiadas', 'calendar-sync'), ('Banki költségek', 'kiadas', 'bank'), ('Törlesztés', 'kiadas', 'credit-card-clock'), ('Gazdaság', 'kiadas', 'sprout'),
+              ('Belső átvezetés', 'atvezetes', 'swap-horizontal'),
               ('Egyéb', 'kiadas', 'ellipsis-horizontal'), ('Fizetés', 'bevetel', 'cash'), ('Egyéb bevétel', 'bevetel', 'cash-plus')]
 # név szerint feltölt (idempotens): a hiányzó kategóriákat létrehozza, a meglévőket nem bántja
 def sorok_lista(tid):

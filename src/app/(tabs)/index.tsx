@@ -27,7 +27,8 @@ export default function DashboardScreen() {
   const kategoriaBontas = useMemo(() => {
     const osszegek = new Map<string, number>();
     for (const t of tranzakciok) {
-      if (t.tipus === 'kiadas' && t.datum.startsWith(honap)) {
+      const tipus = kategoriak.find((k) => k.id === t.kategoria_id)?.tipus;
+      if (t.tipus === 'kiadas' && t.datum.startsWith(honap) && tipus !== 'atvezetes') {
         osszegek.set(t.kategoria_id, (osszegek.get(t.kategoria_id) ?? 0) + t.osszeg);
       }
     }

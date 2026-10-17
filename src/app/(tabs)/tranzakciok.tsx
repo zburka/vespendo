@@ -10,6 +10,7 @@ import { SzemelyValaszto } from '../../components/SzemelyValaszto';
 import { useStore } from '../../store/useStore';
 import type { Tranzakcio } from '../../types';
 import { formatFt, formatNap } from '../../utils/format';
+import { devizaInfo, megjelenitettNev } from '../../utils/kereskedo';
 import { szemelyNev } from '../../utils/szemely';
 
 export default function TranzakciokScreen() {
@@ -76,9 +77,13 @@ export default function TranzakciokScreen() {
           const bevetel = item.tipus !== 'kiadas';
           return (
             <List.Item
-              title={item.kereskedo}
+              title={megjelenitettNev(item.kereskedo)}
               description={`${kat?.nev ?? '?'} · ${szemelyNev(szemelyek, item.tulajdonos)}${
                 item.fizetesi_mod === 'keszpenz' ? ' · készpénz' : ''
+              }${
+                devizaInfo(item.kereskedo, item.megjegyzes)
+                  ? ` · ${devizaInfo(item.kereskedo, item.megjegyzes)}`
+                  : ''
               }${item.allapot === 'banki_egyeztetesre_var' ? ' · egyeztetésre vár' : ''}`}
               left={(p) => (
                 <Ionicons

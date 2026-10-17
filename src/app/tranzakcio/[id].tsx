@@ -39,7 +39,9 @@ export default function TranzakcioSzerkeszto() {
   }
 
   const bevetel = tranzakcio.tipus !== 'kiadas';
-  const valaszthato = kategoriak.filter((k) => k.tipus === (bevetel ? 'bevetel' : 'kiadas'));
+  const valaszthato = kategoriak.filter(
+    (k) => k.tipus === (bevetel ? 'bevetel' : 'kiadas') || k.tipus === 'atvezetes',
+  );
   const minta =
     kereskedoKulcs(tranzakcio.kereskedo) ?? tranzakcio.kereskedo.toLowerCase().slice(0, 60);
 

@@ -22,6 +22,9 @@
   "Egyéb bevétel": 9,
   "Étterem": 10,
   "Egészség": 11,
-  "Előfizetés": 12
+  "Előfizetés": 12,
+  "Törlesztés": 13,
+  "Gazdaság": 14,
+  "Belső átvezetés": 15
  }
 }

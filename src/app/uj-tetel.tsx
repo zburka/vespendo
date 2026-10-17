@@ -34,7 +34,7 @@ export default function UjTetelScreen() {
   );
   const [mentes, setMentes] = useState(false);
 
-  const valaszthato = kategoriak.filter((k) => k.tipus === tipus);
+  const valaszthato = kategoriak.filter((k) => k.tipus === tipus || k.tipus === 'atvezetes');
   const aktivKategoria = valaszthato.some((k) => k.id === kategoriaId)
     ? kategoriaId
     : ((valaszthato.find((k) => k.nev === 'Egyéb bevétel') ?? valaszthato[0])?.id ?? '');

@@ -7,8 +7,11 @@ SZAMOL = r"""
 const honap = (/^\d{4}-\d{2}$/.test($('Webhook').first().json.query.honap || '')) ? $('Webhook').first().json.query.honap : new Date().toISOString().slice(0, 7);
 const sorok = (nev) => $(nev).all().flatMap(i => i.json.results || []);
 const katId = (v) => (v && v[0]) ? v[0].id : null;
-const tr = sorok('Tranzakciók').map(r => ({ osszeg: Number(r.osszeg), kereskedo: String(r.kereskedo || ''), kat: katId(r.kategoria_id), tipus: r.tipus?.value, tul: r.tulajdonos || 'kozos' }));
+const trMind = sorok('Tranzakciók').map(r => ({ osszeg: Number(r.osszeg), kereskedo: String(r.kereskedo || ''), kat: katId(r.kategoria_id), tipus: r.tipus?.value, tul: r.tulajdonos || 'kozos' }));
 const kategoriak = Object.fromEntries(sorok('Kategóriák').map(r => [r.id, r.nev]));
+const katTipus = Object.fromEntries(sorok('Kategóriák').map(r => [r.id, r.tipus?.value]));
+// a belső átvezetés (se kiadás, se bevétel) kimarad az összesítésekből
+const tr = trMind.filter(t => katTipus[t.kat] !== 'atvezetes');
 const kiadasok = tr.filter(t => t.tipus === 'kiadas');
 const katNevek = {};
 for (const t of kiadasok) { const n = kategoriak[t.kat] || 'Egyéb'; katNevek[n] = (katNevek[n] || 0) + t.osszeg; }

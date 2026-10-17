@@ -81,9 +81,10 @@ const uj = alap.uj;
 const KAT = %(kat)s;
 const GEN = /^(vásárlás kártyával|áruvisszavét ellenértéke|azonnali fizetés.*|napközbeni átutalás.*|tranzakció.*)$/i;
 const kulcs = (sz) => {
+  if (/^(azonnali fizetés|napközbeni átutalás|átutalás|csoportos|beszedés)/i.test(String(sz).trim())) return null;
   for (let r of String(sz).split(', ').map(x => x.trim()).filter(Boolean)) {
     if (GEN.test(r) || /^[\d\W]+$/.test(r) || /\d+[,.]?\d*\s?EUR|\bEUR\b/i.test(r)) continue;
-    r = r.replace(/\s*-?apple\b.*$/i, '').replace(/\s+\d{3,}.*$/, '').replace(/\*+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+    r = r.replace(/\s+-apple\b.*$/i, '').replace(/\s+\d{3,}.*$/, '').replace(/\*+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
     if (r.length >= 4) return r;
   }
   return null;
