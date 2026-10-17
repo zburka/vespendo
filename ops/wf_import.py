@@ -13,11 +13,13 @@ const body = $('Webhook').first().json.body || {};
 if (!Array.isArray(body.tranzakciok)) throw new Error('Hiányzó tranzakciok lista');
 if (!/^[a-z0-9_]{1,30}$/.test(String(body.feltolto || ''))) throw new Error('Érvénytelen vagy hiányzó feltoltő (a személy kulcsa kell)');
 const feltolto = body.feltolto;
+// ékezet- és kisbetű-független illesztés (a bank API ékezet nélkül adja a neveket)
+const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const EGYEB = %(egyeb)d, FIZETES = %(fizetes)d, ATUTALAS = %(atutalas)d;
 const ATUTALAS_RE = /^(azonnali fizetés|napközbeni átutalás|átutalás|qvik fizetés|csoportos|beszedés)/i;
 
 const szabalyok = $('Szabályok').all().flatMap(i => i.json.results || [])
-  .map(r => ({ minta: String(r.minta || '').toLowerCase(), kat: r.kategoria_id?.[0]?.id, tul: r.alapertelmezett_tulajdonos || '' }))
+  .map(r => ({ minta: norm(r.minta), kat: r.kategoria_id?.[0]?.id, tul: r.alapertelmezett_tulajdonos || '' }))
   .filter(r => r.minta && r.kat)
   .sort((a, b) => b.minta.length - a.minta.length);
 const meglevo = $('Meglévő tranzakciók').all().flatMap(i => i.json.results || []);
@@ -61,7 +63,7 @@ for (const t of body.tranzakciok) {
   }
 
   // 1. szabálymotor (0 token)
-  const szoveg = (nyers + ' ' + koz).toLowerCase();
+  const szoveg = norm(nyers + ' ' + koz);
   const sz = szabalyok.find(r => szoveg.includes(r.minta));
   const sor = {
     kereskedo: (nyers || koz || 'Ismeretlen').slice(0, 200), datum: t.datum, osszeg,
@@ -94,6 +96,7 @@ OSSZEFESULES = r"""
 const alap = $('Feldolgozás').first().json;
 const uj = alap.uj;
 const KAT = %(kat)s;
+const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const GEN = /^(vásárlás kártyával|áruvisszavét ellenértéke|azonnali fizetés.*|napközbeni átutalás.*|tranzakció.*)$/i;
 const kulcs = (sz) => {
   if (/^(azonnali fizetés|napközbeni átutalás|átutalás|csoportos|beszedés)/i.test(String(sz).trim())) return null;
@@ -110,7 +113,7 @@ if (alap.volt_ismeretlen && %(haiku)s) {
   let haiku = [];
   try { haiku = $('Haiku besorolás').all(); } catch (e) { haiku = []; }
   const chunkok = $('Chunkok').all().map(i => i.json.chunk);
-  const mintak = $('Szabályok').all().flatMap(i => i.json.results || []).map(r => String(r.minta || '').toLowerCase());
+  const mintak = $('Szabályok').all().flatMap(i => i.json.results || []).map(r => norm(r.minta));
   chunkok.forEach((chunk, ci) => {
     let valasz = null;
     try {
@@ -126,7 +129,7 @@ if (alap.volt_ismeretlen && %(haiku)s) {
       uj[c.idx].kategoria_id = [id];
       hasznalt++;
       const k = kulcs(uj[c.idx].kereskedo);
-      if (k && !mintak.some(m => m.includes(k) || k.includes(m)) && !(k in tanult)) tanult[k] = id;
+      if (k && !mintak.some(m => m.includes(norm(k)) || norm(k).includes(m)) && !(k in tanult)) tanult[k] = id;
     });
   });
 }
