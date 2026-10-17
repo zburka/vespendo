@@ -115,12 +115,24 @@ export interface ImportOsszegzes {
   egyeztetve: number;
   szaballyal: number;
   ismeretlen: number;
+  duplikalt?: number;
+  ai_besorolt?: number;
 }
 
 export interface KategoriaModositasKeres {
   tranzakcio_id: string;
-  uj_kategoria_id: string;
-  kereskedo_minta: string;
+  uj_kategoria_id?: string;
+  uj_tulajdonos?: Tulajdonos;
+  kereskedo_minta?: string;
+}
+
+/** `GET /webhook/adatok`: a nem tranzakció jellegű törzsadatok. */
+export interface Alapadatok {
+  kategoriak: Kategoria[];
+  keretek: Koltsegkeret[];
+  elofizetesek: Elofizetes[];
+  celok: MegtakaritasiCel[];
+  szabalyok: Szabaly[];
 }
 
 export interface FajlElemzesKeres {

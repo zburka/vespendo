@@ -8,6 +8,7 @@ import {
   SZABALYOK,
   TRANZAKCIOK,
 } from '../mock/data';
+import { alapadatok, ELO_API, tranzakciokLekeres } from '../services/api';
 import { alkalmazImport } from '../services/mockImport';
 import type {
   BankiImportKeres,
@@ -33,6 +34,11 @@ interface State {
   elofizetesek: Elofizetes[];
   celok: MegtakaritasiCel[];
   szabalyok: Szabaly[];
+  /** Élő módban: töltés állapota és az utolsó hiba. */
+  toltes: boolean;
+  hiba: string | null;
+  /** Élő módban a szerverről (n8n) tölti be az adatokat; mock módban nem csinál semmit. */
+  betoltes: () => Promise<void>;
   setHonap: (honap: string) => void;
   leptetHonap: (delta: number) => void;
   setSzuro: (szuro: TulajdonosSzuro) => void;
@@ -47,12 +53,28 @@ interface State {
 export const useStore = create<State>((set, get) => ({
   honap: aktualisHonap(),
   szuro: 'mind',
-  kategoriak: KATEGORIAK,
-  tranzakciok: TRANZAKCIOK,
-  keretek: KOLTSEGKERETEK,
-  elofizetesek: ELOFIZETESEK,
-  celok: CELOK,
-  szabalyok: SZABALYOK,
+  // élő módban üresen indul és a szerverről töltődik, mock módban a minta adatokkal
+  kategoriak: ELO_API ? [] : KATEGORIAK,
+  tranzakciok: ELO_API ? [] : TRANZAKCIOK,
+  keretek: ELO_API ? [] : KOLTSEGKERETEK,
+  elofizetesek: ELO_API ? [] : ELOFIZETESEK,
+  celok: ELO_API ? [] : CELOK,
+  szabalyok: ELO_API ? [] : SZABALYOK,
+  toltes: false,
+  hiba: null,
+  betoltes: async () => {
+    if (!ELO_API) return;
+    set({ toltes: true, hiba: null });
+    try {
+      const [alap, tr] = await Promise.all([alapadatok(), tranzakciokLekeres()]);
+      set({ ...alap, tranzakciok: tr.tranzakciok, toltes: false });
+    } catch (e) {
+      set({
+        toltes: false,
+        hiba: e instanceof Error ? e.message : 'Az adatok betöltése nem sikerült',
+      });
+    }
+  },
   setHonap: (honap) => set({ honap }),
   leptetHonap: (delta) => set((s) => ({ honap: leptetHonap(s.honap, delta) })),
   setSzuro: (szuro) => set({ szuro }),

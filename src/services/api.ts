@@ -1,12 +1,15 @@
-import { N8N_BASE_URL } from '../config';
+import { N8N_APP_KEY, N8N_BASE_URL } from '../config';
 import type {
+  Alapadatok,
   BankiImportKeres,
   FajlElemzesKeres,
   FajlElemzesValasz,
   HaviOsszesito,
+  ImportOsszegzes,
   KategoriaModositasKeres,
   NyugtaKeres,
   NyugtaValasz,
+  Tranzakcio,
 } from '../types';
 
 /** Ha nincs n8n URL beállítva (EXPO_PUBLIC_N8N_BASE_URL), az app mock adatokkal működik. */
@@ -20,7 +23,7 @@ async function keres<T>(utvonal: string, opciok: { method: 'GET' | 'POST'; body?
   try {
     const res = await fetch(`${N8N_BASE_URL}/webhook/${utvonal}`, {
       method: opciok.method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-App-Key': N8N_APP_KEY },
       body: opciok.body === undefined ? undefined : JSON.stringify(opciok.body),
       signal: vezerlo.signal,
     });
@@ -72,13 +75,30 @@ export async function elemezBankiFajl(body: FajlElemzesKeres) {
   return valasz.data;
 }
 
-/** `POST /webhook/banki-import` (a spec nem ír le válasz-szerkezetet, bármely 2xx siker). */
-export async function bankiImport(body: BankiImportKeres): Promise<void> {
+/**
+ * `POST /webhook/banki-import`. Élő módban az n8n összegzését adja vissza, mock módban `null`
+ * (ekkor a store helyi logikája dolgozik).
+ */
+export async function bankiImport(body: BankiImportKeres): Promise<ImportOsszegzes | null> {
   if (ELO_API) {
-    await keres<unknown>('banki-import', { method: 'POST', body });
-    return;
+    const valasz = await keres<{ data?: ImportOsszegzes }>('banki-import', {
+      method: 'POST',
+      body,
+    });
+    return valasz.data ?? null;
   }
   await kesleltet(1500);
+  return null;
+}
+
+/** `GET /webhook/adatok`: kategóriák, keretek, előfizetések, célok, szabályok. */
+export function alapadatok(): Promise<Alapadatok> {
+  return keres('adatok', { method: 'GET' });
+}
+
+/** `GET /webhook/tranzakciok[?honap=YYYY-MM]` */
+export function tranzakciokLekeres(honap?: string): Promise<{ tranzakciok: Tranzakcio[] }> {
+  return keres(`tranzakciok${honap ? `?honap=${honap}` : ''}`, { method: 'GET' });
 }
 
 /** `GET /webhook/havi-osszesito?honap=YYYY-MM`. Mock módban nem hívható. */

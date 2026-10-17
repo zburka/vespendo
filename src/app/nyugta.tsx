@@ -10,7 +10,7 @@ import {
   TextInput,
 } from 'react-native-paper';
 
-import { feltoltNyugta } from '../services/api';
+import { ELO_API, feltoltNyugta } from '../services/api';
 import { tomorit } from '../services/kepTomorites';
 import { useStore } from '../store/useStore';
 import type { NyugtaValasz } from '../types';
@@ -28,6 +28,7 @@ export default function NyugtaScreen() {
   const router = useRouter();
   const kategoriak = useStore((s) => s.kategoriak);
   const hozzaadTranzakcio = useStore((s) => s.hozzaadTranzakcio);
+  const betoltes = useStore((s) => s.betoltes);
 
   const [megjegyzes, setMegjegyzes] = useState('');
   const [feltolto, setFeltolto] = useState<'ferj' | 'feleseg'>('ferj');
@@ -42,21 +43,25 @@ export default function NyugtaScreen() {
       setFazis('feltoltes');
       const { data } = await feltoltNyugta({ kep_base64, megjegyzes, feltolto });
 
-      const fo = [...data.bontott_tetelek].sort((a, b) => b.osszeg - a.osszeg)[0];
-      const kategoria = kategoriak.find((k) => k.nev === fo?.kategoria && k.tipus === 'kiadas');
-      hozzaadTranzakcio({
-        datum: data.datum,
-        osszeg: data.osszeg,
-        kereskedo: data.kereskedo,
-        kategoria_id: kategoria?.id ?? kategoriak.find((k) => k.tipus === 'kiadas')!.id,
-        tipus: 'kiadas',
-        tulajdonos: feltolto,
-        fizetesi_mod: data.fizetesi_mod,
-        forras: 'nyugta_foto',
-        allapot: data.allapot,
-        megjegyzes: megjegyzes || undefined,
-        nyugta_kep_url: uri,
-      });
+      if (ELO_API) {
+        await betoltes(); // a tételt az n8n már rögzítette a Baserow-ban
+      } else {
+        const fo = [...data.bontott_tetelek].sort((a, b) => b.osszeg - a.osszeg)[0];
+        const kategoria = kategoriak.find((k) => k.nev === fo?.kategoria && k.tipus === 'kiadas');
+        hozzaadTranzakcio({
+          datum: data.datum,
+          osszeg: data.osszeg,
+          kereskedo: data.kereskedo,
+          kategoria_id: kategoria?.id ?? kategoriak.find((k) => k.tipus === 'kiadas')!.id,
+          tipus: 'kiadas',
+          tulajdonos: feltolto,
+          fizetesi_mod: data.fizetesi_mod,
+          forras: 'nyugta_foto',
+          allapot: data.allapot,
+          megjegyzes: megjegyzes || undefined,
+          nyugta_kep_url: uri,
+        });
+      }
       setValasz(data);
       setFazis('kesz');
     } catch (e) {

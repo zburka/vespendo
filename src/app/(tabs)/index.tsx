@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Card, ProgressBar, Text, useTheme } from 'react-native-paper';
 
+import { AdatAllapot } from '../../components/AdatAllapot';
 import { HonapValaszto } from '../../components/HonapValaszto';
 import { useHaviOsszesito } from '../../hooks/useHaviOsszesito';
 import { formatFt, keretSzin } from '../../utils/format';
@@ -13,6 +14,7 @@ export default function DashboardScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <HonapValaszto />
+      <AdatAllapot />
       {betolt && <ActivityIndicator />}
       {hiba && (
         <Text variant="bodySmall" style={{ color: theme.colors.error }}>
@@ -36,7 +38,9 @@ export default function DashboardScreen() {
           left={(p) => <Ionicons name="sparkles" size={p.size} color={theme.colors.primary} />}
         />
         <Card.Content>
-          <Text variant="bodyMedium">{o.ai_elemzes}</Text>
+          <Text variant="bodyMedium">
+            {o.ai_elemzes || 'Az AI elemzés ehhez a hónaphoz még nem érhető el.'}
+          </Text>
         </Card.Content>
       </Card>
 

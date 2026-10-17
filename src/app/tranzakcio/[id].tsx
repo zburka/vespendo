@@ -32,15 +32,22 @@ export default function TranzakcioSzerkeszto() {
   const valaszthato = kategoriak.filter((k) => k.tipus === (bevetel ? 'bevetel' : 'kiadas'));
 
   const mentes = () => {
-    if (kategoriaId !== tranzakcio.kategoria_id) {
-      modositKategoria(tranzakcio.id, kategoriaId);
-      kategoriaModositas({
-        tranzakcio_id: tranzakcio.id,
+    const katValtozott = kategoriaId !== tranzakcio.kategoria_id;
+    const tulValtozott = tulajdonos !== tranzakcio.tulajdonos;
+    if (!katValtozott && !tulValtozott) {
+      router.back();
+      return;
+    }
+    if (katValtozott) modositKategoria(tranzakcio.id, kategoriaId);
+    if (tulValtozott) modositTranzakcio(tranzakcio.id, { tulajdonos });
+    kategoriaModositas({
+      tranzakcio_id: tranzakcio.id,
+      ...(katValtozott && {
         uj_kategoria_id: kategoriaId,
         kereskedo_minta: tranzakcio.kereskedo.toLowerCase(),
-      }).catch(() => Alert.alert('Szinkron', 'A szabály mentése a szerveren nem sikerült.'));
-    }
-    if (tulajdonos !== tranzakcio.tulajdonos) modositTranzakcio(tranzakcio.id, { tulajdonos });
+      }),
+      ...(tulValtozott && { uj_tulajdonos: tulajdonos }),
+    }).catch(() => Alert.alert('Szinkron', 'A módosítás mentése a szerveren nem sikerült.'));
     router.back();
   };
 

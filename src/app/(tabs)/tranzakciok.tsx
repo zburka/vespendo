@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { SectionList, StyleSheet, View } from 'react-native';
 import { Divider, List, SegmentedButtons, Text, useTheme } from 'react-native-paper';
 
+import { AdatAllapot } from '../../components/AdatAllapot';
 import { HonapValaszto } from '../../components/HonapValaszto';
 import { type TulajdonosSzuro, useStore } from '../../store/useStore';
 import type { Tranzakcio } from '../../types';
@@ -19,6 +20,8 @@ export default function TranzakciokScreen() {
   const setSzuro = useStore((s) => s.setSzuro);
   const tranzakciok = useStore((s) => s.tranzakciok);
   const kategoriak = useStore((s) => s.kategoriak);
+  const toltes = useStore((s) => s.toltes);
+  const betoltes = useStore((s) => s.betoltes);
 
   const szekciok = useMemo(() => {
     const lista = tranzakciok
@@ -33,6 +36,7 @@ export default function TranzakciokScreen() {
     <View style={styles.container}>
       <View style={styles.fejlec}>
         <HonapValaszto />
+        <AdatAllapot />
         <SegmentedButtons
           value={szuro}
           onValueChange={(v) => setSzuro(v as TulajdonosSzuro)}
@@ -48,6 +52,8 @@ export default function TranzakciokScreen() {
         sections={szekciok}
         keyExtractor={(t) => t.id}
         stickySectionHeadersEnabled
+        refreshing={toltes}
+        onRefresh={betoltes}
         ItemSeparatorComponent={Divider}
         ListEmptyComponent={<Text style={styles.ures}>Nincs tétel ebben a hónapban.</Text>}
         renderSectionHeader={({ section }) => (
@@ -67,9 +73,22 @@ export default function TranzakciokScreen() {
               description={`${kat?.nev ?? '?'} · ${TULAJDONOS_CIMKE[item.tulajdonos]}${
                 item.allapot === 'banki_egyeztetesre_var' ? ' · egyeztetésre vár' : ''
               }`}
-              left={(p) => <Ionicons name={bevetel ? 'arrow-down-circle' : 'arrow-up-circle'} size={28} color={bevetel ? '#2e7d32' : p.color} style={styles.ikon} />}
+              left={(p) => (
+                <Ionicons
+                  name={bevetel ? 'arrow-down-circle' : 'arrow-up-circle'}
+                  size={28}
+                  color={bevetel ? '#2e7d32' : p.color}
+                  style={styles.ikon}
+                />
+              )}
               right={() => (
-                <Text variant="bodyLarge" style={{ color: bevetel ? '#2e7d32' : theme.colors.onSurface, alignSelf: 'center' }}>
+                <Text
+                  variant="bodyLarge"
+                  style={{
+                    color: bevetel ? '#2e7d32' : theme.colors.onSurface,
+                    alignSelf: 'center',
+                  }}
+                >
                   {bevetel ? '+' : '−'}
                   {formatFt(item.osszeg)}
                 </Text>

@@ -1,0 +1,21 @@
+{
+ "workspace": 102,
+ "database": 103,
+ "tablak": {
+  "kategoriak": 536,
+  "tranzakciok": 537,
+  "szabalymotor": 538,
+  "koltsegkeretek": 539,
+  "elofizetesek": 540,
+  "megtakaritasi_celok": 541
+ },
+ "kategoriak": {
+  "Élelmiszer": 1,
+  "Rezsi": 2,
+  "Szórakozás": 3,
+  "Ruházat": 4,
+  "Közlekedés": 5,
+  "Egyéb": 6,
+  "Fizetés": 7
+ }
+}

@@ -23,6 +23,7 @@ export default function ImportScreen() {
   const { uri, nev } = useLocalSearchParams<{ uri: string; nev: string }>();
   const router = useRouter();
   const mockBankiImport = useStore((s) => s.mockBankiImport);
+  const betoltes = useStore((s) => s.betoltes);
 
   const [fazis, setFazis] = useState<Fazis>('beolvasas');
   const [csv, setCsv] = useState<NonNullable<FajlElemzesValasz['data']> | null>(null);
@@ -63,8 +64,9 @@ export default function ImportScreen() {
     const keres = { feltolto, tranzakciok: csv.tranzakciok };
     try {
       setFazis('kuldes');
-      await bankiImport(keres);
-      if (!ELO_API) setOsszegzes(mockBankiImport(keres));
+      const valasz = await bankiImport(keres);
+      if (ELO_API) await betoltes();
+      setOsszegzes(valasz ?? (ELO_API ? null : mockBankiImport(keres)));
       setFazis('kesz');
     } catch (e) {
       setHiba(e instanceof Error ? e.message : 'Az import nem sikerült');
@@ -186,6 +188,9 @@ export default function ImportScreen() {
                   <Text>Szabállyal besorolva: {osszegzes.szaballyal}</Text>
                   <Text>Nyugtával párosítva: {osszegzes.egyeztetve}</Text>
                   <Text>Ismeretlen (Egyéb kategória): {osszegzes.ismeretlen}</Text>
+                  {!!osszegzes.duplikalt && (
+                    <Text>Már rögzített, kihagyva: {osszegzes.duplikalt}</Text>
+                  )}
                 </>
               ) : (
                 <Text>A tételeket elküldtük feldolgozásra.</Text>

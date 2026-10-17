@@ -41,7 +41,7 @@ export function useHaviOsszesito() {
   const hiba = aktualis !== null && aktualis.adat === null;
   const betolt = ELO_API && aktualis === null;
   const osszesito: HaviOsszesito = aktualis?.adat
-    ? { ...aktualis.adat, elofizetesek: helyi.elofizetesek }
+    ? { ...aktualis.adat, elofizetesek: aktualis.adat.elofizetesek ?? helyi.elofizetesek }
     : helyi;
 
   return { osszesito, hiba, betolt };

@@ -1,9 +1,16 @@
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { useStore } from '../store/useStore';
+
 export default function RootLayout() {
+  useEffect(() => {
+    useStore.getState().betoltes();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <PaperProvider>
@@ -14,7 +21,10 @@ export default function RootLayout() {
             name="tranzakcio/[id]"
             options={{ title: 'Tétel', headerBackTitle: 'Vissza' }}
           />
-          <Stack.Screen name="nyugta" options={{ title: 'Nyugta rögzítése', presentation: 'modal' }} />
+          <Stack.Screen
+            name="nyugta"
+            options={{ title: 'Nyugta rögzítése', presentation: 'modal' }}
+          />
           <Stack.Screen name="import" options={{ title: 'Banki import', presentation: 'modal' }} />
         </Stack>
       </PaperProvider>
