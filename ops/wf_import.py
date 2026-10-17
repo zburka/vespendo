@@ -22,8 +22,8 @@ const szabalyok = $('Szabályok').all().flatMap(i => i.json.results || [])
   .sort((a, b) => b.minta.length - a.minta.length);
 const meglevo = $('Meglévő tranzakciók').all().flatMap(i => i.json.results || []);
 const kulcsok = new Set(meglevo.map(r => r.import_kulcs).filter(Boolean));
-const varakozo = meglevo.filter(r => r.allapot?.value === 'banki_egyeztetesre_var')
-  .map(r => ({ id: r.id, datum: r.datum, osszeg: Number(r.osszeg), hasznalt: false }));
+const varakozo = meglevo.filter(r => r.allapot?.value === 'banki_egyeztetesre_var' && r.fizetesi_mod?.value !== 'keszpenz')
+  .map(r => ({ id: r.id, datum: r.datum, osszeg: Number(r.osszeg), mod: r.fizetesi_mod?.value, hasznalt: false }));
 
 const uj = [], patch = [], ismeretlenek = [];
 const o = { uj: 0, egyeztetve: 0, szaballyal: 0, ismeretlen: 0, duplikalt: 0 };
@@ -42,7 +42,7 @@ for (const t of body.tranzakciok) {
   // 2. nyugtával párosítás: azonos összeg, a nyugta napja és +3 nap között
   if (kiadas) {
     const v = varakozo.find(v => !v.hasznalt && Math.abs(v.osszeg - osszeg) < 0.01 &&
-      (Date.parse(t.datum) - Date.parse(v.datum)) / 864e5 >= 0 && (Date.parse(t.datum) - Date.parse(v.datum)) / 864e5 <= 3);
+      (Date.parse(t.datum) - Date.parse(v.datum)) / 864e5 >= 0 && (Date.parse(t.datum) - Date.parse(v.datum)) / 864e5 <= (v.mod === 'atutalas' ? 10 : 3));
     if (v) { v.hasznalt = true; patch.push({ id: v.id, allapot: 'lezart', import_kulcs: kulcs }); o.egyeztetve++; continue; }
   }
 
@@ -152,7 +152,7 @@ nodes = [
     webhook('Webhook', 'banki-import', 'POST', (0, 0)),
     http('Szabályok', 'GET', f"{BR}{T['szabalymotor']}/?user_field_names=true&size=200", (240, 0), creds=cred_baserow(), lapozas=True),
     http('Meglévő tranzakciók', 'GET',
-         f"{BR}{T['tranzakciok']}/?user_field_names=true&size=200&include=datum,osszeg,allapot,import_kulcs", (480, 0),
+         f"{BR}{T['tranzakciok']}/?user_field_names=true&size=200&include=datum,osszeg,allapot,import_kulcs,fizetesi_mod", (480, 0),
          creds=cred_baserow(), lapozas=True),
     code('Feldolgozás', FELDOLGOZAS, (720, 0), hiba_ag=True),
 ]

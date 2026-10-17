@@ -77,9 +77,9 @@ if (isNaN(kulonbseg) || kulonbseg > 400 || kulonbseg < -2) {
 const mod = ['kartya', 'keszpenz', 'atutalas'].includes(a.fizetesi_mod) ? a.fizetesi_mod : 'kartya';
 const kereskedo = String(a.kereskedo || 'Ismeretlen').slice(0, 200);
 const megj = [e.megj, bontas.length > 1 ? bontas.map(t => t.osszeg + ' ' + t.kategoria).join(', ') : '', datumJegyzet].filter(Boolean).join(' | ');
-return [{ json: { valasz: { kereskedo, osszeg, datum, fizetesi_mod: mod, allapot: 'banki_egyeztetesre_var', bontott_tetelek: bontas },
+return [{ json: { valasz: { kereskedo, osszeg, datum, fizetesi_mod: mod, allapot: mod === 'keszpenz' ? 'lezart' : 'banki_egyeztetesre_var', bontott_tetelek: bontas },
   sor: { kereskedo, datum, osszeg, kategoria_id: [KAT[fo.kategoria]], tipus: 'kiadas', tulajdonos: e.feltolto, fizetesi_mod: mod,
-         forras: 'nyugta_foto', allapot: 'banki_egyeztetesre_var', megjegyzes: megj } } }];
+         forras: 'nyugta_foto', allapot: mod === 'keszpenz' ? 'lezart' : 'banki_egyeztetesre_var', megjegyzes: megj } } }];
 """ % {'kat': json.dumps(KAT_ID, ensure_ascii=False)}
 nodes = [
     webhook('Webhook', 'nyugta-feltoltes', 'POST', (0, 0)),

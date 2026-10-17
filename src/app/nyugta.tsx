@@ -114,7 +114,11 @@ export default function NyugtaScreen() {
                   {t.kategoria}: {formatFt(t.osszeg)}
                 </Text>
               ))}
-              <Text variant="bodySmall">Banki egyeztetésre vár.</Text>
+              <Text variant="bodySmall">
+                {valasz.allapot === 'banki_egyeztetesre_var'
+                  ? 'A banki kivonat betöltésekor automatikusan párosítjuk.'
+                  : 'Készpénzes tétel, nincs mit párosítani.'}
+              </Text>
             </Card.Content>
           </Card>
           <Button mode="contained" onPress={() => router.back()}>
