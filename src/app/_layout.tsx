@@ -43,6 +43,7 @@ export default function RootLayout() {
             options={{ title: 'Nyugta rögzítése', presentation: 'modal' }}
           />
           <Stack.Screen name="import" options={{ title: 'Banki import', presentation: 'modal' }} />
+          <Stack.Screen name="uj-tetel" options={{ title: 'Új tétel', presentation: 'modal' }} />
         </Stack>
       </PaperProvider>
     </SafeAreaProvider>

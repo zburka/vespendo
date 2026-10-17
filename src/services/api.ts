@@ -10,6 +10,7 @@ import type {
   NyugtaKeres,
   NyugtaValasz,
   Tranzakcio,
+  UjTranzakcioKeres,
 } from '../types';
 
 /** Alapból élő módban fut; mock adatokkal csak `EXPO_PUBLIC_MOCK=1` esetén. */
@@ -154,4 +155,10 @@ export async function celMentes(body: {
 export async function celTorles(id: string): Promise<void> {
   if (!ELO_API) return;
   await keres<unknown>('cel-torles', { method: 'POST', body: { id } });
+}
+
+/** `POST /webhook/tranzakcio-felvetel`: kézi tétel rögzítése. Mock módban nincs teendő (a store rögzíti helyben). */
+export async function ujTranzakcio(body: UjTranzakcioKeres): Promise<void> {
+  if (!ELO_API) return;
+  await keres<unknown>('tranzakcio-felvetel', { method: 'POST', body });
 }

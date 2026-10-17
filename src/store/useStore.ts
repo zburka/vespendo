@@ -31,6 +31,8 @@ import type {
 } from '../types';
 import { aktualisHonap, leptetHonap } from '../utils/format';
 
+let elsoBetoltes = true;
+
 export type TulajdonosSzuro = 'mind' | Tulajdonos;
 
 interface State {
@@ -86,6 +88,15 @@ export const useStore = create<State>((set, get) => ({
     try {
       const [alap, tr] = await Promise.all([alapadatok(), tranzakciokLekeres()]);
       set({ ...alap, tranzakciok: tr.tranzakciok, toltes: false });
+      if (elsoBetoltes) {
+        // induláskor az utolsó olyan hónapra ugrik, amelyben van tétel (ha az aktuális üres)
+        elsoBetoltes = false;
+        const { honap, tranzakciok } = get();
+        if (tranzakciok.length && !tranzakciok.some((t) => t.datum.startsWith(honap))) {
+          const utolso = tranzakciok.reduce((m, t) => (t.datum > m ? t.datum : m), '');
+          set({ honap: utolso.slice(0, 7) });
+        }
+      }
     } catch (e) {
       if (e instanceof HibasKulcs) {
         set({ toltes: false, kulcsSzukseges: true });

@@ -61,6 +61,7 @@ export function MuveletGomb() {
             onPress: () => nyugtaKivalasztas('galeria'),
           },
           { icon: 'file-table', label: 'Banki fájl tallózása', onPress: bankiFajl },
+          { icon: 'pencil-plus', label: 'Kézi hozzáadás', onPress: () => router.push('/uj-tetel') },
         ]}
       />
     </Portal>

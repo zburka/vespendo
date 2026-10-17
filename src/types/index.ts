@@ -155,3 +155,14 @@ export interface FajlElemzesValasz {
     egyenleg_ellenorzes?: { nyito: number; zaro: number; egyezik: boolean; elteres: number } | null;
   };
 }
+
+export interface UjTranzakcioKeres {
+  osszeg: number;
+  datum: string; // YYYY-MM-DD
+  kereskedo: string;
+  kategoria_id: string;
+  tipus: TranzakcioTipus;
+  tulajdonos: Tulajdonos;
+  fizetesi_mod: FizetesiMod;
+  megjegyzes?: string;
+}
