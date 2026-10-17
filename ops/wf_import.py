@@ -60,7 +60,7 @@ for (const t of body.tranzakciok) {
 o.uj = uj.length;
 o.ismeretlen = ismeretlenek.length;
 return [{ json: { uj, patch, ismeretlenek, osszegzes: o, volt_ismeretlen: ismeretlenek.length > 0 } }];
-""" % {'egyeb': KAT_ID['Egyéb'], 'fizetes': KAT_ID['Fizetés']}
+""" % {'egyeb': KAT_ID['Egyéb'], 'fizetes': KAT_ID['Egyéb bevétel']}
 
 CHUNKOK = r"""
 const lista = $('Feldolgozás').first().json.ismeretlenek;
@@ -70,7 +70,7 @@ return out;
 """
 
 HAIKU_BODY = ("={{ JSON.stringify({ model: 'claude-haiku-5-5', max_tokens: 700, thinking: { type: 'disabled' }, "
-  "system: 'Magyar banki tételeket sorolsz be kategóriába. Kategóriák: Élelmiszer, Rezsi, Szórakozás, Ruházat, Közlekedés, Egyéb. "
+  "system: 'Magyar banki tételeket sorolsz be kategóriába. Kategóriák: Élelmiszer, Rezsi, Szórakozás, Ruházat, Közlekedés, Banki költségek, Egyéb. "
   "Bemenet soronként: sorszám|leírás|összeg. Válaszolj KIZÁRÓLAG egy JSON tömbbel, soronként egy kategórianévvel, a bemenet sorrendjében.', "
   "messages: [{ role: 'user', content: $json.chunk.map((c, i) => i + '|' + c.szoveg + '|' + c.osszeg).join('\\n') }] }) }}")
 

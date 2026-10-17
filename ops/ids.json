@@ -16,6 +16,8 @@
   "Ruházat": 4,
   "Közlekedés": 5,
   "Egyéb": 6,
-  "Fizetés": 7
+  "Fizetés": 7,
+  "Banki költségek": 8,
+  "Egyéb bevétel": 9
  }
 }

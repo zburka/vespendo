@@ -44,7 +44,7 @@ export function alkalmazImport(
       datum: b.datum,
       osszeg: b.osszeg,
       kereskedo: b.kereskedo_nyers || b.kozlemeny || 'Ismeretlen',
-      kategoria_id: szabaly?.kategoria_id ?? (bevetel ? 'kat_fizetes' : 'kat_egyeb'),
+      kategoria_id: szabaly?.kategoria_id ?? (bevetel ? 'kat_egyeb_bev' : 'kat_egyeb'),
       tipus: bevetel ? 'bevetel_egyszeri' : 'kiadas',
       tulajdonos: szabaly?.alapertelmezett_tulajdonos ?? keres.feltolto,
       fizetesi_mod: 'kartya',

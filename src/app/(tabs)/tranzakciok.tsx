@@ -71,8 +71,8 @@ export default function TranzakciokScreen() {
             <List.Item
               title={item.kereskedo}
               description={`${kat?.nev ?? '?'} · ${TULAJDONOS_CIMKE[item.tulajdonos]}${
-                item.allapot === 'banki_egyeztetesre_var' ? ' · egyeztetésre vár' : ''
-              }`}
+                item.fizetesi_mod === 'keszpenz' ? ' · készpénz' : ''
+              }${item.allapot === 'banki_egyeztetesre_var' ? ' · egyeztetésre vár' : ''}`}
               left={(p) => (
                 <Ionicons
                   name={bevetel ? 'arrow-down-circle' : 'arrow-up-circle'}

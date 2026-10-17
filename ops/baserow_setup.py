@@ -80,17 +80,27 @@ def sorok(tid, items):
     return api('POST', f'/api/database/rows/table/{tid}/batch/?user_field_names=true', {'items': items})['items']
 
 KATEGORIAK = [('Élelmiszer', 'kiadas', 'cart'), ('Rezsi', 'kiadas', 'flash'), ('Szórakozás', 'kiadas', 'film'),
-              ('Ruházat', 'kiadas', 'shirt'), ('Közlekedés', 'kiadas', 'car'), ('Egyéb', 'kiadas', 'ellipsis-horizontal'),
-              ('Fizetés', 'bevetel', 'cash')]
-if ures(kat):
-    sorok(kat, [{'nev': n, 'tipus': t, 'ikon': i} for n, t, i in KATEGORIAK])
-kat_id = {r['nev']: r['id'] for r in api('GET', f'/api/database/rows/table/{kat}/?user_field_names=true&size=200')['results']}
+              ('Ruházat', 'kiadas', 'shirt'), ('Közlekedés', 'kiadas', 'car'), ('Banki költségek', 'kiadas', 'bank'),
+              ('Egyéb', 'kiadas', 'ellipsis-horizontal'), ('Fizetés', 'bevetel', 'cash'), ('Egyéb bevétel', 'bevetel', 'cash-plus')]
+# név szerint feltölt (idempotens): a hiányzó kategóriákat létrehozza, a meglévőket nem bántja
+def sorok_lista(tid):
+    return api('GET', f'/api/database/rows/table/{tid}/?user_field_names=true&size=200')['results']
+
+letezo_kat = {r['nev'] for r in sorok_lista(kat)}
+uj_kat = [{'nev': n, 'tipus': t, 'ikon': i} for n, t, i in KATEGORIAK if n not in letezo_kat]
+if uj_kat:
+    sorok(kat, uj_kat)
+kat_id = {r['nev']: r['id'] for r in sorok_lista(kat)}
 
 SZABALYOK = [('lidl', 'Élelmiszer'), ('spar', 'Élelmiszer'), ('tesco', 'Élelmiszer'), ('aldi', 'Élelmiszer'), ('kifli', 'Élelmiszer'),
              ('mvm', 'Rezsi'), ('telekom', 'Rezsi'), ('digi', 'Rezsi'), ('netflix', 'Szórakozás'), ('spotify', 'Szórakozás'),
-             ('mol ', 'Közlekedés'), ('omv', 'Közlekedés')]
-if ures(sz):
-    sorok(sz, [{'minta': m, 'kategoria_id': [kat_id[k]], 'alapertelmezett_tulajdonos': 'kozos'} for m, k in SZABALYOK])
+             ('mol ', 'Közlekedés'), ('omv', 'Közlekedés'),
+             ('tranzakció költsége', 'Banki költségek'), ('megb.díj', 'Banki költségek'), ('havidíj', 'Banki költségek'),
+             ('munkabér', 'Fizetés')]
+letezo_minta = {r['minta'] for r in sorok_lista(sz)}
+uj_sz = [{'minta': m, 'kategoria_id': [kat_id[k]], 'alapertelmezett_tulajdonos': 'kozos'} for m, k in SZABALYOK if m not in letezo_minta]
+if uj_sz:
+    sorok(sz, uj_sz)
 
 # --- saját adatbázis-token a VeSpendo munkaterülethez
 tokenek = api('GET', '/api/database/tokens/')

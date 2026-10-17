@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Chip, SegmentedButtons, Text, TextInput } from 'react-native-paper';
@@ -14,24 +14,29 @@ const maiNap = () => {
 
 export default function UjTetelScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ tipus?: string; mod?: string }>();
   const kategoriak = useStore((s) => s.kategoriak);
   const hozzaadTranzakcio = useStore((s) => s.hozzaadTranzakcio);
   const betoltes = useStore((s) => s.betoltes);
   const setHonap = useStore((s) => s.setHonap);
 
-  const [tipus, setTipus] = useState<'kiadas' | 'bevetel'>('kiadas');
+  const [tipus, setTipus] = useState<'kiadas' | 'bevetel'>(
+    params.tipus === 'bevetel' ? 'bevetel' : 'kiadas',
+  );
   const [nev, setNev] = useState('');
   const [osszeg, setOsszeg] = useState('');
   const [datum, setDatum] = useState(maiNap());
   const [kategoriaId, setKategoriaId] = useState('');
   const [tulajdonos, setTulajdonos] = useState<Tulajdonos>('kozos');
-  const [mod, setMod] = useState<FizetesiMod>('keszpenz');
+  const [mod, setMod] = useState<FizetesiMod>(
+    params.mod === 'kartya' || params.mod === 'atutalas' ? params.mod : 'keszpenz',
+  );
   const [mentes, setMentes] = useState(false);
 
   const valaszthato = kategoriak.filter((k) => k.tipus === tipus);
   const aktivKategoria = valaszthato.some((k) => k.id === kategoriaId)
     ? kategoriaId
-    : (valaszthato[0]?.id ?? '');
+    : ((valaszthato.find((k) => k.nev === 'Egyéb bevétel') ?? valaszthato[0])?.id ?? '');
 
   const ment = async () => {
     const ertek = Number(osszeg.replace(/[\s ]/g, '').replace(',', '.'));

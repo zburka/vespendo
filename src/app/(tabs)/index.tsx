@@ -1,15 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Card, ProgressBar, Text, useTheme } from 'react-native-paper';
+import { useRouter } from 'expo-router';
+import { ActivityIndicator, Button, Card, ProgressBar, Text, useTheme } from 'react-native-paper';
 
 import { AdatAllapot } from '../../components/AdatAllapot';
 import { HonapValaszto } from '../../components/HonapValaszto';
+import { useStore } from '../../store/useStore';
 import { useHaviOsszesito } from '../../hooks/useHaviOsszesito';
 import { formatFt, keretSzin } from '../../utils/format';
+import { keszpenzAllapot } from '../../utils/osszesito';
 
 export default function DashboardScreen() {
   const theme = useTheme();
   const { osszesito: o, hiba, betolt } = useHaviOsszesito();
+  const router = useRouter();
+  const tranzakciok = useStore((s) => s.tranzakciok);
+  const keszpenz = useMemo(() => keszpenzAllapot(tranzakciok), [tranzakciok]);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -31,6 +38,38 @@ export default function DashboardScreen() {
         ertek={o.egyenleg}
         szin={o.egyenleg >= 0 ? '#2e7d32' : '#d32f2f'}
       />
+
+      <Card>
+        <Card.Title
+          title="Készpénz"
+          left={(p) => <Ionicons name="wallet" size={p.size} color={theme.colors.primary} />}
+        />
+        <Card.Content>
+          <Text
+            variant="headlineSmall"
+            style={{ color: keszpenz.egyenleg >= 0 ? '#2e7d32' : '#d32f2f' }}
+          >
+            {formatFt(keszpenz.egyenleg)}
+          </Text>
+          <Text variant="bodySmall">
+            Kapott: {formatFt(keszpenz.bevetel)} · Elköltött: {formatFt(keszpenz.kiadas)}
+          </Text>
+        </Card.Content>
+        <Card.Actions>
+          <Button
+            icon="cash-plus"
+            onPress={() => router.push('/uj-tetel?tipus=bevetel&mod=keszpenz')}
+          >
+            Kapott készpénz
+          </Button>
+          <Button
+            icon="cash-minus"
+            onPress={() => router.push('/uj-tetel?tipus=kiadas&mod=keszpenz')}
+          >
+            Készpénzes kiadás
+          </Button>
+        </Card.Actions>
+      </Card>
 
       <Card>
         <Card.Title

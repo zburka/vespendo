@@ -1,11 +1,5 @@
 import { AI_ELEMZESEK } from '../mock/data';
-import type {
-  Elofizetes,
-  HaviOsszesito,
-  Kategoria,
-  Koltsegkeret,
-  Tranzakcio,
-} from '../types';
+import type { Elofizetes, HaviOsszesito, Kategoria, Koltsegkeret, Tranzakcio } from '../types';
 
 interface Bemenet {
   honap: string;
@@ -58,4 +52,22 @@ export function szamolHaviOsszesito(b: Bemenet): HaviOsszesito {
       .reduce((s, e) => s + e.varhato_osszeg, 0),
     ai_elemzes: AI_ELEMZESEK[b.honap] ?? 'Ehhez a hónaphoz még nincs elemzés.',
   };
+}
+
+export interface KeszpenzAllapot {
+  egyenleg: number;
+  bevetel: number;
+  kiadas: number;
+}
+
+/** Készpénzállomány: a készpénzes bevételek és kiadások különbsége, az összes időszakra. */
+export function keszpenzAllapot(tranzakciok: Tranzakcio[]): KeszpenzAllapot {
+  let bevetel = 0;
+  let kiadas = 0;
+  for (const t of tranzakciok) {
+    if (t.fizetesi_mod !== 'keszpenz') continue;
+    if (t.tipus === 'kiadas') kiadas += t.osszeg;
+    else bevetel += t.osszeg;
+  }
+  return { egyenleg: bevetel - kiadas, bevetel, kiadas };
 }
