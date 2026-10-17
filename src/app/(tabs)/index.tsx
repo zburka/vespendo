@@ -1,16 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Card, IconButton, ProgressBar, Text, useTheme } from 'react-native-paper';
+import { Card, ProgressBar, Text, useTheme } from 'react-native-paper';
 
+import { HonapValaszto } from '../../components/HonapValaszto';
 import { useStore } from '../../store/useStore';
-import { formatFt, formatHonap, keretSzin } from '../../utils/format';
+import { formatFt, keretSzin } from '../../utils/format';
 import { szamolHaviOsszesito } from '../../utils/osszesito';
 
 export default function DashboardScreen() {
   const theme = useTheme();
   const honap = useStore((s) => s.honap);
-  const leptet = useStore((s) => s.leptetHonap);
   const tranzakciok = useStore((s) => s.tranzakciok);
   const kategoriak = useStore((s) => s.kategoriak);
   const keretek = useStore((s) => s.keretek);
@@ -23,11 +23,7 @@ export default function DashboardScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.honapValaszto}>
-        <IconButton icon="chevron-left" onPress={() => leptet(-1)} accessibilityLabel="Előző hónap" />
-        <Text variant="titleLarge">{formatHonap(honap)}</Text>
-        <IconButton icon="chevron-right" onPress={() => leptet(1)} accessibilityLabel="Következő hónap" />
-      </View>
+      <HonapValaszto />
 
       <View style={styles.sor}>
         <OsszegKartya cim="Bevétel" ertek={o.osszes_bevetel} szin="#2e7d32" />
@@ -113,7 +109,6 @@ function OsszegKartya({ cim, ertek, szin }: { cim: string; ertek: number; szin: 
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 12 },
-  honapValaszto: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sor: { flexDirection: 'row', gap: 12 },
   osszegKartya: { flex: 1 },
   lista: { gap: 12 },

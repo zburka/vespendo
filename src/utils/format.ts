@@ -31,3 +31,9 @@ export function keretSzin(szazalek: number): string {
   if (szazalek >= 75) return '#f9a825';
   return '#2e7d32';
 }
+
+/** '2026-10-15' -> '2026. október 15.' */
+export function formatNap(datum: string): string {
+  const [ev, ho, nap] = datum.split('-').map(Number);
+  return `${ev}. ${HONAPOK[ho - 1]} ${nap}.`;
+}

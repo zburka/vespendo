@@ -70,3 +70,10 @@ export interface HaviOsszesito {
   varhato_hatralevo_elofizetesek: number;
   ai_elemzes: string;
 }
+
+export interface Szabaly {
+  id: string;
+  minta: string; // kisbetűs keresőszó
+  kategoria_id: string;
+  alapertelmezett_tulajdonos?: Tulajdonos;
+}

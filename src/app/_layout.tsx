@@ -10,6 +10,10 @@ export default function RootLayout() {
         <StatusBar style="auto" />
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="tranzakcio/[id]"
+            options={{ title: 'Tétel', headerBackTitle: 'Vissza' }}
+          />
         </Stack>
       </PaperProvider>
     </SafeAreaProvider>
