@@ -149,3 +149,52 @@ def test_ertelmetlen_fajl_hiba(tartalom):
 def test_xls_nem_tamogatott():
     with pytest.raises(ParseHiba):
         elemez(b"\xd0\xcf\x11\xe0", "regi.xls")
+
+
+def test_otp_szeru_pdf_ketjegyu_datum_nyito_zaro_egyenleg():
+    """OTP-szerű elrendezés: YY.MM.DD dátumok, két dátum soronként, nyitó/záró egyenleg sor,
+    oldalfejléc az új oldal tetején, elromlott betűkódolás."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+
+    def sor(c, y, d1, d2, leiras, osszeg):
+        c.drawString(40, y, d1)
+        if d2:
+            c.drawString(110, y, d2)
+        c.drawString(180 if d2 else 110, y, leiras)
+        c.drawRightString(560, y, osszeg)
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.drawString(40, 800, "SZAMLAKIVONAT 1.LAP/2 LAP")
+    sor(c, 770, "26.09.02", None, "NYITO EGYENLEG", "10.000")
+    sor(c, 754, "26.09.02", "26.09.02", "VASARLAS, 1234567890, Tranzakcio: 26.09.01, SPAR", "-2.790")
+    sor(c, 738, "26.09.04", "26.09.04", "AZONNALI FIZETES, Munkaado Kft", "500")
+    c.showPage()
+    c.drawString(40, 800, "SZAMLASZAM: 12345678 2.LAP/2 LAP")
+    c.drawString(40, 784, "FORGALMAK")
+    sor(c, 760, "26.09.14", "26.09.14", "VASARLAS KARTYAVAL, Tßp-termÚny bolt", "-1.000")
+    sor(c, 744, "26.10.01", None, "ZARO EGYENLEG", "6.710")
+    c.drawString(40, 700, "Lablec: tajekoztato szoveg")
+    c.save()
+
+    r = elemez(buf.getvalue(), "kivonat.pdf")
+    assert _kulcsok(r) == [
+        ("2026-09-02", 2790.0, "kiadas"),
+        ("2026-09-04", 500.0, "bevetel"),
+        ("2026-09-14", 1000.0, "kiadas"),
+    ]
+    assert r["egyenleg_ellenorzes"]["egyezik"] is True
+    assert r["megbizhatosag"] == "magas"
+    assert "SPAR" in r["tranzakciok"][0]["kereskedo_nyers"]
+    assert "1234567890" not in r["tranzakciok"][0]["kereskedo_nyers"]  # azonosító-zaj kiszűrve
+    assert "Táp-termény bolt" in r["tranzakciok"][2]["kereskedo_nyers"]  # betűkódolás javítva
+    assert "SZAMLASZAM" not in r["tranzakciok"][1]["kozlemeny"] + r["tranzakciok"][1]["kereskedo_nyers"]
+
+
+def test_egyenleg_elteres_figyelmeztet():
+    csv = "Datum;Nev;Osszeg\n26.09.02;NYITO EGYENLEG;1000\n26.09.03;A;-100\n26.09.04;B;-200\n26.09.05;ZARO EGYENLEG;500\n"
+    r = elemez(csv.encode(), "x.csv")
+    assert r["egyenleg_ellenorzes"]["egyezik"] is False
+    assert any("nem egyezik" in f for f in r["figyelmeztetesek"])
+    assert r["megbizhatosag"] != "magas"

@@ -8,7 +8,8 @@ DATUM_MINTAK = [
 ]
 # sor eleji dátum a PDF szöveges módjához
 DATUM_SOR_ELEJE = re.compile(
-    r"^\s*(\d{4}[.\-/ ]+\d{1,2}[.\-/ ]+\d{1,2}\.?|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{4}\.?)(?=\s|$)"
+    r"^\s*(\d{4}[.\-/ ]+\d{1,2}[.\-/ ]+\d{1,2}\.?|\d{1,2}[.\-/]\d{1,2}[.\-/]\d{4}\.?"
+    r"|\d{2}[.\-/]\d{2}[.\-/]\d{2}\.?)(?=\s|$)"
 )
 PENZNEM = re.compile(r"(?i)\b(huf|ft|eur|usd|chf|gbp)\b|[€$£]")
 SZAM = re.compile(r"^[+-]?\d+(?:[.,]\d+)?$")

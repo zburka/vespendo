@@ -139,5 +139,7 @@ export interface FajlElemzesValasz {
     kihagyott: number;
     megbizhatosag: Megbizhatosag;
     figyelmeztetesek: string[];
+    /** Nyitó/záró egyenleg alapú ellenőrzés (ha a kivonat tartalmaz ilyet). */
+    egyenleg_ellenorzes?: { nyito: number; zaro: number; egyezik: boolean; elteres: number } | null;
   };
 }

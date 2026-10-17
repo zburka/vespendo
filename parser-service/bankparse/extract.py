@@ -75,7 +75,7 @@ def _pdf(adat: bytes) -> Sorok:
         raise ParseHiba("A PDF nem olvasható (sérült vagy jelszóval védett).") from e
 
     tablazat: Sorok = []
-    sorok_szovegbol: list[str] = []
+    oldalak_sorai: list[list[str]] = []
     szoveg_van = False
     with pdf:
         for oldal in pdf.pages:
@@ -86,33 +86,73 @@ def _pdf(adat: bytes) -> Sorok:
                         tablazat.append(tisztitott)
             szoveg = oldal.extract_text() or ""
             szoveg_van = szoveg_van or bool(szoveg.strip())
-            sorok_szovegbol.extend(_sorok_szavakbol(oldal))
+            oldalak_sorai.append(_sorok_szavakbol(oldal))
 
     if not szoveg_van:
         raise ParseHiba("A PDF képként tartalmaz szöveget (szkennelt), ez nem támogatott.")
     # táblázatos mód, ha a táblák tartalmaznak dátumot; egyébként soronkénti szövegelemzés
     if sum(1 for r in tablazat if any(cells.datum(c) for c in r)) >= 3:
         return tablazat
-    return _szoveges_sorok(sorok_szovegbol)
+    return _szoveges_sorok(oldalak_sorai)
 
 
-def _szoveges_sorok(sorok: list[str]) -> Sorok:
-    """[dátum, leírás, szám1, szám2, ...] sorok; a dátum nélküli sorok az előző leírásához fűződnek."""
+_MOJIBAKE_JELEK = "ß÷Ř"
+
+
+def _mojibake_javit(szoveg: str) -> str:
+    """Egyes banki PDF-ek betűkódolása elromlott (cp1250 bájtok cp852-ként olvasva):
+    'Tßp-termÚny' -> 'Táp-termény'. Csak a félreérthetetlen jeleket tartalmazó szavakat javítja."""
+    def javit(m: re.Match) -> str:
+        szo = m.group(0)
+        if not any(j in szo for j in _MOJIBAKE_JELEK):
+            return szo
+        try:
+            return szo.encode("cp852").decode("cp1250")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            return szo
+    return re.sub(r"\S+", javit, szoveg)
+
+
+def _szamok_a_sor_vegen(maradek: str) -> tuple[str, list[str]]:
+    """Az oszlophatárral (tabulátor) elválasztott záró számmezők; ennek híján erős összegminták."""
+    mezok = [m for m in maradek.split("\t")]
+    szamok: list[str] = []
+    while len(mezok) > 1:
+        mezo = mezok[-1].strip()
+        if mezo and cells.osszeg(mezo) is not None and cells.datum(mezo) is None:
+            szamok.insert(0, mezo)
+            mezok.pop()
+        else:
+            break
+    if szamok:
+        return "\t".join(mezok), szamok
+    v = _VEGE.search(maradek)
+    if v:
+        return maradek[: v.start()], [x.strip() for x in _SZAMOK.findall(v.group(1))]
+    return maradek, []
+
+
+def _szoveges_sorok(oldalak: list[list[str]]) -> Sorok:
+    """[dátum, leírás, szám1, szám2, ...] sorok. A dátum nélküli sorok az előző tétel leírásához
+    fűződnek, de csak az oldalon belül: az oldal fejléce az első dátumos sor előtt eldobódik."""
     eredmeny: Sorok = []
-    for nyers in sorok:
-        sor = nyers.replace(" ", " ")
-        m = cells.DATUM_SOR_ELEJE.match(sor)
-        if not m:
-            if eredmeny and sor.strip() and not _VEGE.search(sor):
-                eredmeny[-1][1] = f"{eredmeny[-1][1]} {sor.strip()}".strip()
-            continue
-        maradek = sor[m.end():]
-        szamok: list[str] = []
-        v = _VEGE.search(maradek)
-        if v:
-            szamok = [x.strip() for x in _SZAMOK.findall(v.group(1))]
-            maradek = maradek[: v.start()]
-        eredmeny.append([m.group(1), maradek.strip(), *szamok])
+    for oldal in oldalak:
+        utolso: list[object] | None = None
+        for nyers in oldal:
+            sor = nyers.replace("\u00a0", " ")
+            m = cells.DATUM_SOR_ELEJE.match(sor)
+            if not m:
+                if utolso is not None and sor.strip() and not _VEGE.search(sor):
+                    utolso[1] = f"{utolso[1]} {sor.strip().replace(chr(9), ' ')}".strip()
+                continue
+            maradek = sor[m.end():]
+            masodik = cells.DATUM_SOR_ELEJE.match(maradek)  # értéknap: a könyvelési dátum marad
+            if masodik:
+                maradek = maradek[masodik.end():]
+            leiras, szamok = _szamok_a_sor_vegen(maradek)
+            leiras = _mojibake_javit(re.sub(r"\s+", " ", leiras.replace("\t", " ")).strip())
+            utolso = [m.group(1), leiras, *szamok]
+            eredmeny.append(utolso)
     return eredmeny
 
 

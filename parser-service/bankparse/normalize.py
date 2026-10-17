@@ -1,6 +1,7 @@
 """Nyers sorokból egységes tranzakciólista, a tartalom (nem a fix szerkezet) alapján."""
 import re
 import unicodedata
+from datetime import date
 
 from . import cells
 from .extract import ParseHiba, Sorok
@@ -24,11 +25,70 @@ def _kulcsszo(fejlec: str, kulcsok: tuple[str, ...]) -> bool:
     return any(k in fejlec for k in kulcsok)
 
 
+_KETJEGYU = re.compile(r"^\s*(\d{2})([.\-/])(\d{2})\2(\d{2})\.?\s*$")
+_EGYENLEG_SOR = re.compile(
+    r"(nyito|zaro)\s*egyenleg|opening balance|closing balance|balance (brought|carried) forward"
+)
+
+
+def _ketjegyu_evek(sorok: Sorok) -> Sorok:
+    """'26.09.02' formátum: az évet a kisebb változatosságú komponens adja (a kivonat egy időszak)."""
+    talalatok = [
+        _KETJEGYU.match(c) for s in sorok for c in s if isinstance(c, str) and _KETJEGYU.match(c)
+    ]
+    if len(talalatok) < 3:
+        return sorok
+    elso = {m.group(1) for m in talalatok}
+    harmadik = {m.group(4) for m in talalatok}
+    ymd = len(elso) <= len(harmadik)
+
+    def atir(c):
+        m = _KETJEGYU.match(c) if isinstance(c, str) else None
+        if not m:
+            return c
+        a, b, d = int(m.group(1)), int(m.group(3)), int(m.group(4))
+        try:
+            return (date(2000 + a, b, d) if ymd else date(2000 + d, b, a)).isoformat()
+        except ValueError:
+            return c
+
+    return [[atir(c) for c in s] for s in sorok]
+
+
+def _egyenleg_sor(sor) -> str | None:
+    """'nyito' / 'zaro', ha a sor nyitó vagy záró egyenleg sor."""
+    for c in sor:
+        if isinstance(c, str):
+            t = _EGYENLEG_SOR.search(_ascii(c))
+            if t:
+                return "nyito" if "nyito" in t.group(0) or "opening" in t.group(0) or "brought" in t.group(0) else "zaro"
+    return None
+
+
+def _partner_tisztit(szoveg: str) -> str:
+    """Hosszú, vesszővel tagolt banki leírásból az azonosító-zajt (hosszú számok, BIC, 'Tranzakció:'
+    stb.) eldobja, hogy a kereskedő neve olvasható maradjon."""
+    reszek = [r.strip() for r in szoveg.split(", ")]
+    if len(reszek) < 3:
+        return szoveg
+    megtartott = []
+    for r in reszek:
+        if not r or re.search(r"\d{6,}", r) or re.fullmatch(r"[#\d\W]+", r):
+            continue
+        if re.match(r"(?i)(tranzakci[oó]:|\(\d+\.\))", r) or re.fullmatch(r"[A-Z]\.\d{4}", r):
+            continue
+        if re.fullmatch(r"[A-Z]{6}[A-Z0-9]{2,5}", r):  # BIC
+            continue
+        megtartott.append(r)
+    return ", ".join(megtartott)[:160] or szoveg[:160]
+
+
 def normalizal(sorok: Sorok) -> dict:
     if not sorok:
         raise ParseHiba("A fájlban nincs feldolgozható adat.")
     szeles = max(len(s) for s in sorok)
     sorok = [list(s) + [""] * (szeles - len(s)) for s in sorok]
+    sorok = _ketjegyu_evek(sorok)
 
     # 1. dátum oszlop: amelyikben a legtöbb dátumszerű cella van
     datum_db = [sum(cells.datum(s[c]) is not None for s in sorok) for c in range(szeles)]
@@ -48,7 +108,19 @@ def normalizal(sorok: Sorok) -> dict:
     if len(jeloltek) > 1:
         elsodleges = [c for c in jeloltek if _kulcsszo(fejlec[c], DATUM_ELSO[:3])]
         datum_oszlop = (elsodleges or jeloltek)[0]
-    adat = [sorok[i] for i in adat_sorok]
+    nyito_zaro: dict[str, float] = {}
+    adat = []
+    for i in adat_sorok:
+        fajta = _egyenleg_sor(sorok[i])
+        if fajta:  # nyitó/záró egyenleg sor: nem tranzakció, de az ellenőrzéshez jó
+            szamok = [cells.osszeg(c) for j, c in enumerate(sorok[i]) if j != datum_oszlop]
+            szamok = [x for x in szamok if x is not None]
+            if szamok:
+                nyito_zaro[fajta] = szamok[-1]
+            continue
+        adat.append(sorok[i])
+    if not adat:
+        raise ParseHiba("Nem sikerült tételeket kinyerni a fájlból.")
 
     # 2. összeg-jelölt oszlopok
     jeloltek_osszeg: list[int] = []
@@ -173,6 +245,9 @@ def normalizal(sorok: Sorok) -> dict:
             continue
         kozlemeny = _szoveg(s, kozlemeny_c)
         partner = _szoveg(s, partner_c) or kozlemeny
+        if partner.count(", ") >= 2:  # hosszú banki leírás: nyers szöveg a közleménybe, tiszta név a partnerbe
+            kozlemeny = kozlemeny or partner[:400]
+            partner = _partner_tisztit(partner)
         tranzakciok.append(
             {
                 "datum": cells.datum(s[datum_oszlop]),
@@ -197,6 +272,20 @@ def normalizal(sorok: Sorok) -> dict:
             "használtuk. Ellenőrizd az előnézetet."
         )
 
+    ellenorzes = None
+    if "nyito" in nyito_zaro and "zaro" in nyito_zaro:
+        osszes = sum(t["osszeg"] if t["irany"] == "bevetel" else -t["osszeg"] for t in tranzakciok)
+        elteres = round(nyito_zaro["zaro"] - nyito_zaro["nyito"] - osszes, 2)
+        egyezik = abs(elteres) < 0.51
+        ellenorzes = {"nyito": nyito_zaro["nyito"], "zaro": nyito_zaro["zaro"], "egyezik": egyezik, "elteres": elteres}
+        if egyezik:  # a tételek összege igazolja az irányokat is
+            figyelmeztetesek = [f for f in figyelmeztetesek if "iránya" not in f]
+        else:
+            figyelmeztetesek.append(
+                f"A tételek összege nem egyezik a nyitó és záró egyenleg különbségével "
+                f"(eltérés: {elteres:,.0f} Ft). Hiányozhat vagy hibás lehet néhány tétel.".replace(",", " ")
+            )
+
     van_negativ = any(t["irany"] == "kiadas" for t in tranzakciok)
     van_pozitiv = any(t["irany"] == "bevetel" for t in tranzakciok)
     iranyjel_megbizhato = (
@@ -216,6 +305,10 @@ def normalizal(sorok: Sorok) -> dict:
         megbizhatosag = "kozepes"
     else:
         megbizhatosag = "alacsony"
+    if ellenorzes and ellenorzes["egyezik"]:
+        megbizhatosag = "magas"
+    elif ellenorzes and megbizhatosag == "magas":
+        megbizhatosag = "kozepes"
     if kihagyott:
         figyelmeztetesek.append(f"{kihagyott} sor kimaradt (hiányzó összeg).")
 
@@ -224,6 +317,7 @@ def normalizal(sorok: Sorok) -> dict:
         "kihagyott": kihagyott,
         "megbizhatosag": megbizhatosag,
         "figyelmeztetesek": figyelmeztetesek,
+        "egyenleg_ellenorzes": ellenorzes,
     }
 
 

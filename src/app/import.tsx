@@ -119,6 +119,12 @@ export default function ImportScreen() {
               {csv.kihagyott > 0 && (
                 <Text variant="bodySmall">{csv.kihagyott} sor kihagyva (hiányos adat).</Text>
               )}
+              {csv.egyenleg_ellenorzes?.egyezik && (
+                <Text variant="bodySmall" style={styles.rendben}>
+                  ✓ Egyenleg egyezik: {formatFt(csv.egyenleg_ellenorzes.nyito)} →{' '}
+                  {formatFt(csv.egyenleg_ellenorzes.zaro)}
+                </Text>
+              )}
               {csv.megbizhatosag !== 'magas' && (
                 <Text variant="bodySmall" style={styles.figyelmeztetes}>
                   Felismerés megbízhatósága:{' '}
@@ -204,4 +210,5 @@ const styles = StyleSheet.create({
   elvalaszto: { marginVertical: 8 },
   hiba: { color: '#d32f2f' },
   figyelmeztetes: { color: '#b26a00' },
+  rendben: { color: '#2e7d32' },
 });
