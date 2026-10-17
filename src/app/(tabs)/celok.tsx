@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useMemo, useState } from 'react';
 import { Alert, Keyboard, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Button,
@@ -19,6 +20,7 @@ import { AdatAllapot } from '../../components/AdatAllapot';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { useStore } from '../../store/useStore';
 import type { Elofizetes, Kategoria, MegtakaritasiCel } from '../../types';
+import { type ElofizetesJavaslat, elofizetesJavaslatok } from '../../utils/elofizetes';
 import { formatFt } from '../../utils/format';
 
 type Szerkesztes =
@@ -39,6 +41,9 @@ export default function CelokScreen() {
   const mentCel = useStore((s) => s.mentCel);
   const torolCel = useStore((s) => s.torolCel);
   const elofizetesek = useStore((s) => s.elofizetesek);
+  const tranzakciok = useStore((s) => s.tranzakciok);
+  const elutasitott = useStore((s) => s.elutasitott);
+  const elvetJavaslat = useStore((s) => s.elvetJavaslat);
   const mentElofizetes = useStore((s) => s.mentElofizetes);
   const torolElofizetes = useStore((s) => s.torolElofizetes);
 
@@ -53,6 +58,10 @@ export default function CelokScreen() {
   const billentyuzet = useKeyboardHeight();
 
   const kiadasKategoriak = kategoriak.filter((k) => k.tipus === 'kiadas');
+  const javaslatok = useMemo(
+    () => elofizetesJavaslatok(tranzakciok, kategoriak, elofizetesek, elutasitott),
+    [tranzakciok, kategoriak, elofizetesek, elutasitott],
+  );
 
   const megnyitCel = (cel?: MegtakaritasiCel) => {
     setNev(cel?.cel_neve ?? '');
@@ -60,12 +69,14 @@ export default function CelokScreen() {
     setAktualis(cel ? String(cel.aktualis_osszeg) : '0');
     setSzerkesztes({ tipus: 'cel', cel });
   };
-  const megnyitEf = (ef?: Elofizetes) => {
-    setNev(ef?.megnevezes ?? '');
-    setOsszeg(ef ? String(ef.varhato_osszeg) : '');
-    setNap(ef ? String(ef.esedekesseg_napja) : '1');
+  // a javaslat az űrlapot előre kitölti, a mentés előtt módosítható
+  const megnyitEf = (ef?: Elofizetes, javaslat?: ElofizetesJavaslat) => {
+    setNev(ef?.megnevezes ?? javaslat?.nev ?? '');
+    setOsszeg(ef ? String(ef.varhato_osszeg) : javaslat ? String(javaslat.osszeg) : '');
+    setNap(ef ? String(ef.esedekesseg_napja) : javaslat ? String(javaslat.nap) : '1');
     setEfKategoria(
       ef?.kategoria_id ??
+        javaslat?.kategoria_id ??
         kategoriak.find((k) => k.nev === 'Előfizetés')?.id ??
         kiadasKategoriak[0]?.id ??
         '',
@@ -191,7 +202,40 @@ export default function CelokScreen() {
           Új előfizetés
         </Button>
       </View>
-      {elofizetesek.length === 0 && <Text variant="bodyMedium">Még nincs előfizetés felvéve.</Text>}
+      {javaslatok.length > 0 && (
+        <Card mode="outlined">
+          <Card.Title
+            title="Javaslatok a tranzakciókból"
+            subtitle="Havonta ismétlődő, azonos összegű tételek"
+            left={(p) => (
+              <Ionicons name="bulb-outline" size={p.size} color={theme.colors.primary} />
+            )}
+          />
+          <Card.Content>
+            {javaslatok.map((j, i) => (
+              <View key={j.kulcs}>
+                {i > 0 && <Divider style={styles.elvalaszto} />}
+                <Text variant="bodyLarge">{j.nev}</Text>
+                <Text variant="bodySmall">
+                  ~{formatFt(j.osszeg)} · minden hónap {j.nap}. napja körül · {j.honapok} hónapban ·{' '}
+                  {kategoriak.find((k) => k.id === j.kategoria_id)?.nev ?? ''}
+                </Text>
+                <View style={styles.javaslatGombok}>
+                  <Button compact onPress={() => elvetJavaslat(j.kulcs)}>
+                    Elvetés
+                  </Button>
+                  <Button compact mode="contained-tonal" onPress={() => megnyitEf(undefined, j)}>
+                    Hozzáadás
+                  </Button>
+                </View>
+              </View>
+            ))}
+          </Card.Content>
+        </Card>
+      )}
+      {elofizetesek.length === 0 && javaslatok.length === 0 && (
+        <Text variant="bodyMedium">Még nincs előfizetés felvéve.</Text>
+      )}
       {elofizetesek.map((ef) => (
         <Card key={ef.id}>
           <Card.Title
@@ -332,5 +376,7 @@ const styles = StyleSheet.create({
   sav: { height: 10, borderRadius: 5 },
   dialogus: { gap: 12 },
   chipek: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  elvalaszto: { marginVertical: 10 },
+  javaslatGombok: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 },
   kapcsolo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

@@ -18,6 +18,8 @@ export default function TabLayout() {
           name="index"
           options={{
             title: 'Dashboard',
+            headerTitle: 'VeSpendo',
+            headerTitleStyle: { fontWeight: '700' },
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="home" size={size} color={color as string} />
             ),

@@ -17,3 +17,18 @@ export async function szerepOlvas(): Promise<Szerep | null> {
   return ertek && /^[a-z0-9_]{1,30}$/.test(ertek) ? ertek : null;
 }
 export const szerepMent = (szerep: Szerep) => SecureStore.setItemAsync(SZEREP, szerep);
+
+const ELUTASITOTT = 'vespendo.elutasitott_javaslatok';
+
+/** Az elvetett előfizetés-javaslatok kulcsai (kereskedő|összeg). */
+export async function elutasitottOlvas(): Promise<string[]> {
+  try {
+    const nyers = await SecureStore.getItemAsync(ELUTASITOTT);
+    const lista = nyers ? JSON.parse(nyers) : [];
+    return Array.isArray(lista) ? lista.filter((x) => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+export const elutasitottMent = (lista: string[]) =>
+  SecureStore.setItemAsync(ELUTASITOTT, JSON.stringify(lista));

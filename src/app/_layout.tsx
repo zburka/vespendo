@@ -7,11 +7,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KulcsPrompt } from '../components/KulcsPrompt';
 import { SzerepPrompt } from '../components/SzerepPrompt';
 import { ELO_API, setAppKulcs, vanAppKulcs } from '../services/api';
-import { kulcsOlvas, szerepOlvas } from '../services/kulcs';
+import { elutasitottOlvas, kulcsOlvas, szerepOlvas } from '../services/kulcs';
 import { useStore } from '../store/useStore';
 
 export default function RootLayout() {
   useEffect(() => {
+    elutasitottOlvas().then((l) => useStore.getState().setElutasitott(l));
     (async () => {
       if (!ELO_API) return;
       try {

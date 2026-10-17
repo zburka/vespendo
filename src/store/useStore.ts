@@ -21,7 +21,7 @@ import {
   szemelyMentes,
   tranzakciokLekeres,
 } from '../services/api';
-import { szerepMent } from '../services/kulcs';
+import { elutasitottMent, szerepMent } from '../services/kulcs';
 import { alkalmazImport } from '../services/mockImport';
 import type {
   BankiImportKeres,
@@ -79,6 +79,10 @@ interface State {
   torolElofizetes: (id: string) => Promise<void>;
   /** Helyi állapotból törli a tételt (a szerveroldali törlés külön hívás). */
   torolTranzakcioLokal: (id: string) => void;
+  /** Elvetett előfizetés-javaslatok (kereskedő|összeg), a telefonon tárolva. */
+  elutasitott: string[];
+  setElutasitott: (lista: string[]) => void;
+  elvetJavaslat: (kulcs: string) => Promise<void>;
   setHonap: (honap: string) => void;
   leptetHonap: (delta: number) => void;
   setSzuro: (szuro: TulajdonosSzuro) => void;
@@ -234,6 +238,17 @@ export const useStore = create<State>((set, get) => ({
   },
   torolTranzakcioLokal: (id) =>
     set((s) => ({ tranzakciok: s.tranzakciok.filter((t) => t.id !== id) })),
+  elutasitott: [],
+  setElutasitott: (elutasitott) => set({ elutasitott }),
+  elvetJavaslat: async (kulcs) => {
+    const lista = [...new Set([...get().elutasitott, kulcs])];
+    set({ elutasitott: lista });
+    try {
+      await elutasitottMent(lista);
+    } catch {
+      // a tároló nem érhető el: az elvetés csak az aktuális munkamenetre él
+    }
+  },
   setHonap: (honap) => set({ honap }),
   leptetHonap: (delta) => set((s) => ({ honap: leptetHonap(s.honap, delta) })),
   setSzuro: (szuro) => set({ szuro }),
