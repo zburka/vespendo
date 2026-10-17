@@ -95,7 +95,7 @@ def sorok(tid, items):
     return api('POST', f'/api/database/rows/table/{tid}/batch/?user_field_names=true', {'items': items})['items']
 
 KATEGORIAK = [('Élelmiszer', 'kiadas', 'cart'), ('Rezsi', 'kiadas', 'flash'), ('Szórakozás', 'kiadas', 'film'),
-              ('Ruházat', 'kiadas', 'shirt'), ('Étterem', 'kiadas', 'silverware-fork-knife'), ('Közlekedés', 'kiadas', 'car'), ('Egészség', 'kiadas', 'heart-pulse'), ('Előfizetés', 'kiadas', 'calendar-sync'), ('Banki költségek', 'kiadas', 'bank'), ('Törlesztés', 'kiadas', 'credit-card-clock'), ('Gazdaság', 'kiadas', 'sprout'),
+              ('Ruházat', 'kiadas', 'shirt'), ('Étterem', 'kiadas', 'silverware-fork-knife'), ('Közlekedés', 'kiadas', 'car'), ('Egészség', 'kiadas', 'heart-pulse'), ('Előfizetés', 'kiadas', 'calendar-sync'), ('Banki költségek', 'kiadas', 'bank'), ('Törlesztés', 'kiadas', 'credit-card-clock'), ('Átutalás', 'kiadas', 'bank-transfer-out'), ('Gazdaság', 'kiadas', 'sprout'),
               ('Belső átvezetés', 'atvezetes', 'swap-horizontal'),
               ('Egyéb', 'kiadas', 'ellipsis-horizontal'), ('Fizetés', 'bevetel', 'cash'), ('Egyéb bevétel', 'bevetel', 'cash-plus')]
 # név szerint feltölt (idempotens): a hiányzó kategóriákat létrehozza, a meglévőket nem bántja

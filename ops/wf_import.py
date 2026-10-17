@@ -13,7 +13,8 @@ const body = $('Webhook').first().json.body || {};
 if (!Array.isArray(body.tranzakciok)) throw new Error('Hiányzó tranzakciok lista');
 if (!/^[a-z0-9_]{1,30}$/.test(String(body.feltolto || ''))) throw new Error('Érvénytelen vagy hiányzó feltoltő (a személy kulcsa kell)');
 const feltolto = body.feltolto;
-const EGYEB = %(egyeb)d, FIZETES = %(fizetes)d;
+const EGYEB = %(egyeb)d, FIZETES = %(fizetes)d, ATUTALAS = %(atutalas)d;
+const ATUTALAS_RE = /^(azonnali fizetés|napközbeni átutalás|átutalás|qvik fizetés|csoportos|beszedés)/i;
 
 const szabalyok = $('Szabályok').all().flatMap(i => i.json.results || [])
   .map(r => ({ minta: String(r.minta || '').toLowerCase(), kat: r.kategoria_id?.[0]?.id, tul: r.alapertelmezett_tulajdonos || '' }))
@@ -50,18 +51,18 @@ for (const t of body.tranzakciok) {
   const sz = szabalyok.find(r => szoveg.includes(r.minta));
   const sor = {
     kereskedo: (nyers || koz || 'Ismeretlen').slice(0, 200), datum: t.datum, osszeg,
-    kategoria_id: [sz?.kat || (kiadas ? EGYEB : FIZETES)], tipus: kiadas ? 'kiadas' : 'bevetel_egyszeri', tulajdonos: sz?.tul || feltolto,
+    kategoria_id: [sz?.kat || (kiadas ? (ATUTALAS_RE.test(nyers.trim()) ? ATUTALAS : EGYEB) : FIZETES)], tipus: kiadas ? 'kiadas' : 'bevetel_egyszeri', tulajdonos: sz?.tul || feltolto,
     fizetesi_mod: /k[aá]rty/i.test(koz + ' ' + nyers) ? 'kartya' : 'atutalas', forras: 'bank_import', allapot: 'lezart',
     megjegyzes: koz.slice(0, 1000), import_kulcs: kulcs,
   };
   if (sz) o.szaballyal++;
-  else if (kiadas) ismeretlenek.push({ idx: uj.length, szoveg: (nyers + ' ' + koz).slice(0, 140), osszeg });
+  else if (kiadas && !ATUTALAS_RE.test(nyers.trim())) ismeretlenek.push({ idx: uj.length, szoveg: (nyers + ' ' + koz).slice(0, 140), osszeg });
   uj.push(sor);
 }
 o.uj = uj.length;
 o.ismeretlen = ismeretlenek.length;
 return [{ json: { uj, patch, ismeretlenek, osszegzes: o, volt_ismeretlen: ismeretlenek.length > 0 } }];
-""" % {'egyeb': KAT_ID['Egyéb'], 'fizetes': KAT_ID['Egyéb bevétel']}
+""" % {'egyeb': KAT_ID['Egyéb'], 'fizetes': KAT_ID['Egyéb bevétel'], 'atutalas': KAT_ID['Átutalás']}
 
 CHUNKOK = r"""
 const lista = $('Feldolgozás').first().json.ismeretlenek;

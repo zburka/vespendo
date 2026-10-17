@@ -8,6 +8,8 @@ T_ = {'Authorization': 'Token ' + ENV['BASEROW_VESPENDO_TOKEN']}
 URL = f"{BASEROW}/api/database/rows/table/{T['tranzakciok']}/"
 BANK = re.compile(r'TRANZAKCIÓ KÖLTSÉGE|MEGB\.DÍJ|HAVIDÍJ|SZÁMLACSOMAG', re.I)
 MUNKABER = re.compile(r'munkabér', re.I)
+# átutalás típusú tétel: a leírás az átutalás fajtájával kezdődik (nem vásárlás)
+ATUTALAS = re.compile(r'^(azonnali fizetés|napközbeni átutalás|átutalás|qvik fizetés|csoportos|beszedés)', re.I)
 
 sorok, url = [], URL + '?user_field_names=true&size=200'
 while url:
@@ -20,6 +22,8 @@ for r in sorok:
     tipus = (r['tipus'] or {}).get('value')
     if tipus == 'kiadas' and kat == 'Egyéb' and BANK.search(szoveg):
         valtozas.append({'id': r['id'], 'kategoria_id': [IDS_['Banki költségek']]})
+    elif tipus == 'kiadas' and kat == 'Egyéb' and ATUTALAS.match(r['kereskedo'].strip()):
+        valtozas.append({'id': r['id'], 'kategoria_id': [IDS_['Átutalás']]})
     elif tipus != 'kiadas' and kat == 'Fizetés' and not MUNKABER.search(szoveg):
         valtozas.append({'id': r['id'], 'kategoria_id': [IDS_['Egyéb bevétel']]})
 print('átsorolandó tételek:', len(valtozas))

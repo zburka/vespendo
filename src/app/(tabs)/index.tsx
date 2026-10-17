@@ -6,9 +6,10 @@ import { ActivityIndicator, Button, Card, ProgressBar, Text, useTheme } from 're
 
 import { AdatAllapot } from '../../components/AdatAllapot';
 import { HonapValaszto } from '../../components/HonapValaszto';
+import { KeretSav } from '../../components/KeretSav';
 import { useStore } from '../../store/useStore';
 import { useHaviOsszesito } from '../../hooks/useHaviOsszesito';
-import { formatFt, keretSzin } from '../../utils/format';
+import { formatFt } from '../../utils/format';
 import { keszpenzAllapot } from '../../utils/osszesito';
 
 export default function DashboardScreen() {
@@ -189,11 +190,12 @@ export default function DashboardScreen() {
                     {formatFt(k.elkoltve)} / {formatFt(k.havi_keret)} ({k.szazalek}%)
                   </Text>
                 </View>
-                <ProgressBar
-                  progress={Math.min(k.szazalek / 100, 1)}
-                  color={keretSzin(k.szazalek)}
-                  style={styles.sav}
-                />
+                <KeretSav elkoltve={k.elkoltve} keret={k.havi_keret} />
+                {k.elkoltve > k.havi_keret && (
+                  <Text variant="bodySmall" style={{ color: theme.colors.error }}>
+                    {formatFt(k.elkoltve - k.havi_keret)} túllépés
+                  </Text>
+                )}
               </View>
             </Pressable>
           ))}
