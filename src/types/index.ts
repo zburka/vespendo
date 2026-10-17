@@ -77,3 +77,21 @@ export interface Szabaly {
   kategoria_id: string;
   alapertelmezett_tulajdonos?: Tulajdonos;
 }
+
+export interface NyugtaKeres {
+  kep_base64: string;
+  megjegyzes: string;
+  feltolto: Exclude<Tulajdonos, 'kozos'>;
+}
+
+export interface NyugtaValasz {
+  status: 'success';
+  data: {
+    kereskedo: string;
+    osszeg: number;
+    datum: string;
+    fizetesi_mod: FizetesiMod;
+    allapot: Allapot;
+    bontott_tetelek: { kategoria: string; osszeg: number }[];
+  };
+}

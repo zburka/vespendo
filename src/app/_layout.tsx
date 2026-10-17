@@ -14,6 +14,7 @@ export default function RootLayout() {
             name="tranzakcio/[id]"
             options={{ title: 'Tétel', headerBackTitle: 'Vissza' }}
           />
+          <Stack.Screen name="nyugta" options={{ title: 'Nyugta rögzítése', presentation: 'modal' }} />
         </Stack>
       </PaperProvider>
     </SafeAreaProvider>

@@ -32,6 +32,7 @@ interface State {
   setHonap: (honap: string) => void;
   leptetHonap: (delta: number) => void;
   setSzuro: (szuro: TulajdonosSzuro) => void;
+  hozzaadTranzakcio: (t: Omit<Tranzakcio, 'id'>) => string;
   modositTranzakcio: (id: string, valtozas: Partial<Tranzakcio>) => void;
   /** Kategóriát átállít, és a kereskedőre új szabályt generál (mock a `kategoria-modositas` végpontra). */
   modositKategoria: (id: string, ujKategoriaId: string) => void;
@@ -49,6 +50,11 @@ export const useStore = create<State>((set) => ({
   setHonap: (honap) => set({ honap }),
   leptetHonap: (delta) => set((s) => ({ honap: leptetHonap(s.honap, delta) })),
   setSzuro: (szuro) => set({ szuro }),
+  hozzaadTranzakcio: (t) => {
+    const id = `rec${Date.now()}`;
+    set((s) => ({ tranzakciok: [...s.tranzakciok, { ...t, id }] }));
+    return id;
+  },
   modositTranzakcio: (id, valtozas) =>
     set((s) => ({
       tranzakciok: s.tranzakciok.map((t) => (t.id === id ? { ...t, ...valtozas } : t)),
