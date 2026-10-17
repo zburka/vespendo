@@ -12,6 +12,7 @@
     "expo-router": "~57.0.28",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-paper": "^5.15.3",
     "react-native-safe-area-context": "~5.7.0",
@@ -24,9 +25,6 @@
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
     "typescript": "~6.0.3"
-  },
-  "overrides": {
-    "react-dom": "19.3.0"
   },
   "scripts": {
     "start": "expo start",
