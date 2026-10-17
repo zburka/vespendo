@@ -198,3 +198,40 @@ def test_egyenleg_elteres_figyelmeztet():
     assert r["egyenleg_ellenorzes"]["egyezik"] is False
     assert any("nem egyezik" in f for f in r["figyelmeztetesek"])
     assert r["megbizhatosag"] != "magas"
+
+
+def test_devizas_vasarlas_leiras_vegi_toredek_nem_osszeg():
+    """'3,560EUR 0,' a leírás része: a végén álló '0,' nem lehet második szám (az összeg a másik oszlopba csúszna)."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+
+    def sor(c, y, d, leiras, deviza, osszeg):
+        c.drawString(40, y, d)
+        c.drawString(110, y, d)
+        c.drawString(180, y, leiras)
+        if deviza:
+            c.drawString(330, y, deviza)
+        c.drawRightString(560, y, osszeg)
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    c.drawString(40, 800, "FORGALMAK")
+    c.drawString(40, 785, "26.02.01")
+    c.drawString(110, 785, "NYITO EGYENLEG")
+    c.drawRightString(560, 785, "10.000")
+    sor(c, 770, "26.02.02", "VASARLAS, SPAR", None, "-2.000")
+    sor(c, 754, "26.02.03", "VASARLAS, APPLE.COM/BILL,", "3,560EUR 0,", "-1.290")
+    sor(c, 738, "26.02.04", "VASARLAS, ALDI", None, "-500")
+    c.drawString(40, 722, "26.02.28")
+    c.drawString(110, 722, "ZARO EGYENLEG")
+    c.drawRightString(560, 722, "6.210")
+    c.save()
+
+    r = elemez(buf.getvalue(), "kivonat.pdf")
+    assert _kulcsok(r) == [
+        ("2026-02-02", 2000.0, "kiadas"),
+        ("2026-02-03", 1290.0, "kiadas"),
+        ("2026-02-04", 500.0, "kiadas"),
+    ]
+    assert r["kihagyott"] == 0
+    assert r["egyenleg_ellenorzes"]["egyezik"] is True

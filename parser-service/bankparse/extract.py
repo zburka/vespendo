@@ -119,7 +119,13 @@ def _szamok_a_sor_vegen(maradek: str) -> tuple[str, list[str]]:
     szamok: list[str] = []
     while len(mezok) > 1:
         mezo = mezok[-1].strip()
-        if mezo and cells.osszeg(mezo) is not None and cells.datum(mezo) is None:
+        # a vesszővel/ponttal záródó töredék ('0,' a '10,960EUR 0,' devizás leírás végén) nem összeg, hanem a leírás része
+        if (
+            mezo
+            and not re.search(r"[,.]$", mezo)
+            and cells.osszeg(mezo) is not None
+            and cells.datum(mezo) is None
+        ):
             szamok.insert(0, mezo)
             mezok.pop()
         else:
