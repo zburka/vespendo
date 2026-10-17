@@ -33,9 +33,12 @@ export class HibasKulcs extends Error {
 
 const IDOTUL_MS = 60_000;
 
-async function keres<T>(utvonal: string, opciok: { method: 'GET' | 'POST'; body?: unknown }) {
+async function keres<T>(
+  utvonal: string,
+  opciok: { method: 'GET' | 'POST'; body?: unknown; idotulMs?: number },
+) {
   const vezerlo = new AbortController();
-  const idozito = setTimeout(() => vezerlo.abort(), IDOTUL_MS);
+  const idozito = setTimeout(() => vezerlo.abort(), opciok.idotulMs ?? IDOTUL_MS);
   try {
     const res = await fetch(`${N8N_BASE_URL}/webhook/${utvonal}`, {
       method: opciok.method,
@@ -209,4 +212,46 @@ export async function szemelyMentes(body: {
   if (!ELO_API) return null;
   const valasz = await keres<{ kulcs?: string }>('szemely-mentes', { method: 'POST', body });
   return valasz.kulcs ?? null;
+}
+
+export interface BankKapcsolat {
+  id: string;
+  szemely: string;
+  iban_vege: string;
+  lejarat: string | null;
+  napok_hatra: number | null;
+  utolso_szinkron: string | null;
+  lejart: boolean;
+}
+
+export interface BankSzinkronEredmeny {
+  szemely: string;
+  ok: boolean;
+  hiba: string;
+  uj: number;
+  duplikalt: number;
+  letoltott: number;
+}
+
+/** `GET /webhook/bank-allapot`: az összekötött bankszámlák és a hozzáférés lejárata. */
+export async function bankAllapot(): Promise<BankKapcsolat[]> {
+  if (!ELO_API) return [];
+  const v = await keres<{ kapcsolatok: BankKapcsolat[] }>('bank-allapot', { method: 'GET' });
+  return v.kapcsolatok;
+}
+
+/** `POST /webhook/bank-osszekotes`: a bank jóváhagyási hivatkozása (böngészőben kell megnyitni). */
+export async function bankOsszekotes(szemely: string): Promise<string> {
+  const v = await keres<{ url: string }>('bank-osszekotes', { method: 'POST', body: { szemely } });
+  return v.url;
+}
+
+/** `POST /webhook/bank-szinkron`: az új banki tételek letöltése és importálása (kézi indítás). */
+export async function bankSzinkron(): Promise<BankSzinkronEredmeny[]> {
+  const v = await keres<{ kapcsolatok: BankSzinkronEredmeny[] }>('bank-szinkron', {
+    method: 'POST',
+    body: {},
+    idotulMs: 180_000,
+  });
+  return v.kapcsolatok;
 }

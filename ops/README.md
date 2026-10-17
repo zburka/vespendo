@@ -19,6 +19,7 @@ python3 wf_gyors_import.py      # POST /webhook/banki-fajl-gyors-import  (elemz�
 python3 wf_keretek.py           # POST /webhook/keret-mentes, /cel-mentes, /cel-torles
 python3 wf_felvetel.py          # POST /webhook/tranzakcio-felvetel (kézi tétel)
 python3 wf_szerkesztok.py       # POST /webhook/elofizetes-mentes, /elofizetes-torles, /tranzakcio-modositas, /tranzakcio-torles, /szemely-mentes
+python3 wf_bank.py              # banki összekötés: bank-osszekotes, bank-callback, bank-szinkron, bank-allapot + napi ütemező (BANK_URL felülírható)
 ```
 
 A webhookok `X-App-Key` fejlécet várnak. A Haiku / Sonnet lépések akkor épülnek be, ha az n8n-ben létezik a

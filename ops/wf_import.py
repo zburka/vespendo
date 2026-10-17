@@ -35,7 +35,9 @@ for (const t of body.tranzakciok) {
   const koz = String(t.kozlemeny || '');
   const alap = `${t.datum}|${osszeg}|${nyers}`;
   szamlalo[alap] = (szamlalo[alap] || 0) + 1;
-  const kulcs = `${alap}#${szamlalo[alap]}`;
+  // a banki API saját, stabil azonosítót ad ('eb:…'); a PDF-hez a dátum|összeg|név#sorszám kulcs tartozik
+  const apiKulcs = typeof t.kulcs === 'string' && /^eb:/.test(t.kulcs) ? t.kulcs : null;
+  const kulcs = apiKulcs || `${alap}#${szamlalo[alap]}`;
   if (kulcsok.has(kulcs)) { o.duplikalt++; continue; }
   const kiadas = t.irany !== 'bevetel';
 
@@ -44,6 +46,16 @@ for (const t of body.tranzakciok) {
     const v = varakozo.find(v => !v.hasznalt && Math.abs(v.osszeg - osszeg) < 0.01 &&
       (Date.parse(t.datum) - Date.parse(v.datum)) / 864e5 >= 0 && (Date.parse(t.datum) - Date.parse(v.datum)) / 864e5 <= (v.mod === 'atutalas' ? 10 : 3));
     if (v) { v.hasznalt = true; patch.push({ id: v.id, allapot: 'lezart', import_kulcs: kulcs }); o.egyeztetve++; continue; }
+  }
+
+  // forrásokon átívelő duplikáció-védelem: a PDF-ből már betöltött, azonos személyű, összegű, irányú és napú (±1) tétel
+  if (apiKulcs) {
+    const nap = (a, b) => Math.abs(Date.parse(a) - Date.parse(b)) / 864e5;
+    const kandidat = meglevo
+      .filter(r => !r._hasznalt && r.tulajdonos === feltolto && (r.tipus?.value === 'kiadas') === kiadas &&
+        Math.abs(Number(r.osszeg) - osszeg) < 0.01 && !String(r.import_kulcs || '').startsWith('eb:') && r.datum && nap(r.datum, t.datum) <= 1)
+      .sort((a, b) => nap(a.datum, t.datum) - nap(b.datum, t.datum))[0];
+    if (kandidat) { kandidat._hasznalt = true; patch.push({ id: kandidat.id, import_kulcs: kulcs }); o.duplikalt++; continue; }
   }
 
   // 1. szabálymotor (0 token)
@@ -152,7 +164,7 @@ nodes = [
     webhook('Webhook', 'banki-import', 'POST', (0, 0)),
     http('Szabályok', 'GET', f"{BR}{T['szabalymotor']}/?user_field_names=true&size=200", (240, 0), creds=cred_baserow(), lapozas=True),
     http('Meglévő tranzakciók', 'GET',
-         f"{BR}{T['tranzakciok']}/?user_field_names=true&size=200&include=datum,osszeg,allapot,import_kulcs,fizetesi_mod", (480, 0),
+         f"{BR}{T['tranzakciok']}/?user_field_names=true&size=200&include=datum,osszeg,allapot,import_kulcs,fizetesi_mod,tipus,tulajdonos", (480, 0),
          creds=cred_baserow(), lapozas=True),
     code('Feldolgozás', FELDOLGOZAS, (720, 0), hiba_ag=True),
 ]

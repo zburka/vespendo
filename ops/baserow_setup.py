@@ -73,6 +73,16 @@ for tid, nev in ((tr, 'tulajdonos'), (sz, 'alapertelmezett_tulajdonos')):
     if f['type'] != 'text':
         api('PATCH', f"/api/database/fields/{f['id']}/", {'type': 'text'})
 
+# --- banki kapcsolatok (Enable Banking munkamenetek számlánként)
+bk = tabla('bankkapcsolatok', 'azonosito')   # session_id + számla uid
+mezo(bk, 'szemely', 'text')                  # a személy kulcsa, akinek a számlája
+mezo(bk, 'session_id', 'text')
+mezo(bk, 'szamla_uid', 'text')
+mezo(bk, 'iban', 'text')
+mezo(bk, 'lejarat', 'text')                  # a hozzáférés lejárata (RFC3339)
+mezo(bk, 'utolso_szinkron', 'text')          # YYYY-MM-DD
+mezo(bk, 'aktiv', 'boolean')
+
 kk = tabla('koltsegkeretek', 'nev')
 mezo(kk, 'kategoria_id', 'link_row', link_row_table_id=kat, has_related_field=False)
 mezo(kk, 'havi_keret', 'number', **SZAM)

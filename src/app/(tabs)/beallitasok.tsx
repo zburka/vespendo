@@ -12,6 +12,7 @@ import {
   TextInput,
 } from 'react-native-paper';
 
+import { BankKartya } from '../../components/BankKartya';
 import { SzemelyValaszto } from '../../components/SzemelyValaszto';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { N8N_BASE_URL } from '../../config';
@@ -98,6 +99,8 @@ export default function BeallitasokScreen() {
           </Button>
         </Card.Actions>
       </Card>
+
+      <BankKartya />
 
       <Card>
         <Card.Title title="Szerver" />

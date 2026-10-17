@@ -18,7 +18,12 @@ def node(nev, tipus, ver, params, poz, creds=None, **extra):
     n.update(extra)
     return n
 
-def webhook(nev, ut, metodus, poz):
+def webhook(nev, ut, metodus, poz, nyilvanos=False):
+    """Webhook az app kulcsával védve; `nyilvanos=True` csak ott, ahol kívülről (pl. a bank) hívják."""
+    if nyilvanos:
+        return node(nev, 'n8n-nodes-base.webhook', 2, {
+            'httpMethod': metodus, 'path': ut, 'authentication': 'none', 'responseMode': 'responseNode', 'options': {}}, poz,
+            webhookId=ut)
     return node(nev, 'n8n-nodes-base.webhook', 2, {
         'httpMethod': metodus, 'path': ut, 'authentication': 'headerAuth', 'responseMode': 'responseNode',
         'options': {}}, poz,
@@ -66,8 +71,8 @@ def osszekot(kapcsolatok, a, b, kimenet=0):
     while len(m) <= kimenet: m.append([])
     m[kimenet].append({'node': b, 'type': 'main', 'index': 0})
 
-def telepit(nev, nodes, kapcsolatok):
-    wf = {'name': nev, 'nodes': nodes, 'connections': kapcsolatok, 'settings': {'executionOrder': 'v1'}}
+def telepit(nev, nodes, kapcsolatok, beallitasok=None):
+    wf = {'name': nev, 'nodes': nodes, 'connections': kapcsolatok, 'settings': {'executionOrder': 'v1', **(beallitasok or {})}}
     st, lista = hivas('GET', N8N + '/api/v1/workflows?limit=250', fejlec=HDR)
     meglevo = next((w for w in lista['data'] if w['name'] == nev), None)
     if meglevo:
@@ -92,4 +97,4 @@ def app_hivas(metodus, ut, body=None):
 
 def hiba_valasz(poz, nev='Hiba válasz'):
     """400-as, érthető hibaüzenet a hívónak (a hibaágból)."""
-    return respond(nev, "={{ { status: 'error', uzenet: String($json.error?.message || $json.error || 'Hiba történt') } }}", poz, kod='400')
+    return respond(nev, "={{ { status: 'error', uzenet: String($json.error?.message || $json.error || 'Hiba történt').replace(/\\s*\\[line \\d+\\]\\s*$/, '') } }}", poz, kod='400')

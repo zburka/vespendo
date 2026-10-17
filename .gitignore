@@ -48,3 +48,7 @@ __pycache__/
 # ops: helyi azonosítók (a titkok a VESPENDO_ENV fájlban vannak, nem a repóban)
 ops/n8n_cred.json
 ops/__pycache__/
+
+# titkos kulcsok soha ne kerüljenek a repóba
+*.pem
+*.key
