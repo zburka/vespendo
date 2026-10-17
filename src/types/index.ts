@@ -122,3 +122,22 @@ export interface KategoriaModositasKeres {
   uj_kategoria_id: string;
   kereskedo_minta: string;
 }
+
+export interface FajlElemzesKeres {
+  fajl_nev: string;
+  fajl_base64: string;
+}
+
+export type Megbizhatosag = 'magas' | 'kozepes' | 'alacsony';
+
+/** `POST /webhook/banki-fajl-elemzes` válasza (a Python elemző szolgáltatás kimenete). */
+export interface FajlElemzesValasz {
+  status: 'success' | 'error';
+  uzenet?: string;
+  data?: {
+    tranzakciok: BankiTranzakcio[];
+    kihagyott: number;
+    megbizhatosag: Megbizhatosag;
+    figyelmeztetesek: string[];
+  };
+}

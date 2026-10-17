@@ -32,7 +32,13 @@ export function MuveletGomb() {
 
   const bankiFajl = async () => {
     const eredmeny = await DocumentPicker.getDocumentAsync({
-      type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel', '*/*'],
+      type: [
+        'text/csv',
+        'text/comma-separated-values',
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '*/*',
+      ],
       copyToCacheDirectory: true,
     });
     if (eredmeny.canceled) return;

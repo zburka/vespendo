@@ -11,10 +11,10 @@ import {
   Text,
 } from 'react-native-paper';
 
-import { bankiImport, ELO_API } from '../services/api';
-import { type CsvEredmeny, dekodol, parseBankiCsv } from '../services/csvParser';
+import { bankiImport, ELO_API, elemezBankiFajl } from '../services/api';
+import { dekodol, parseBankiCsv } from '../services/csvParser';
 import { useStore } from '../store/useStore';
-import type { ImportOsszegzes } from '../types';
+import type { FajlElemzesValasz, ImportOsszegzes } from '../types';
 import { formatFt, formatNap } from '../utils/format';
 
 type Fazis = 'beolvasas' | 'elonezet' | 'kuldes' | 'kesz' | 'hiba';
@@ -25,7 +25,7 @@ export default function ImportScreen() {
   const mockBankiImport = useStore((s) => s.mockBankiImport);
 
   const [fazis, setFazis] = useState<Fazis>('beolvasas');
-  const [csv, setCsv] = useState<CsvEredmeny | null>(null);
+  const [csv, setCsv] = useState<NonNullable<FajlElemzesValasz['data']> | null>(null);
   const [feltolto, setFeltolto] = useState<'ferj' | 'feleseg'>('ferj');
   const [osszegzes, setOsszegzes] = useState<ImportOsszegzes | null>(null);
   const [hiba, setHiba] = useState('');
@@ -33,11 +33,20 @@ export default function ImportScreen() {
   useEffect(() => {
     (async () => {
       try {
-        if (!/\.csv$/i.test(nev ?? '')) {
-          throw new Error('Egyelőre csak CSV fájl támogatott. Az XLSX-et exportáld CSV-ként.');
+        let eredmeny: NonNullable<FajlElemzesValasz['data']>;
+        if (ELO_API) {
+          // PDF / XLSX / CSV: a szerveroldali elemző kezeli, formátumtól függetlenül
+          const fajl_base64 = await new File(uri).base64();
+          eredmeny = await elemezBankiFajl({ fajl_nev: nev ?? 'kivonat', fajl_base64 });
+        } else {
+          if (!/\.csv$/i.test(nev ?? '')) {
+            throw new Error(
+              'Mock módban csak CSV olvasható. PDF/XLSX-hez állítsd be az n8n URL-t.',
+            );
+          }
+          const csv = parseBankiCsv(dekodol(await new File(uri).bytes()));
+          eredmeny = { ...csv, megbizhatosag: 'magas', figyelmeztetesek: [] };
         }
-        const bajtok = await new File(uri).bytes();
-        const eredmeny = parseBankiCsv(dekodol(bajtok));
         if (eredmeny.tranzakciok.length === 0)
           throw new Error('A fájlban nincs feldolgozható tétel.');
         setCsv(eredmeny);
@@ -110,6 +119,17 @@ export default function ImportScreen() {
               {csv.kihagyott > 0 && (
                 <Text variant="bodySmall">{csv.kihagyott} sor kihagyva (hiányos adat).</Text>
               )}
+              {csv.megbizhatosag !== 'magas' && (
+                <Text variant="bodySmall" style={styles.figyelmeztetes}>
+                  Felismerés megbízhatósága:{' '}
+                  {csv.megbizhatosag === 'kozepes' ? 'közepes' : 'alacsony'}
+                </Text>
+              )}
+              {csv.figyelmeztetesek.map((f) => (
+                <Text key={f} variant="bodySmall" style={styles.figyelmeztetes}>
+                  ⚠ {f}
+                </Text>
+              ))}
             </Card.Content>
           </Card>
 
@@ -183,4 +203,5 @@ const styles = StyleSheet.create({
   sorBal: { flex: 1 },
   elvalaszto: { marginVertical: 8 },
   hiba: { color: '#d32f2f' },
+  figyelmeztetes: { color: '#b26a00' },
 });

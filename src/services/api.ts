@@ -1,6 +1,8 @@
 import { N8N_BASE_URL } from '../config';
 import type {
   BankiImportKeres,
+  FajlElemzesKeres,
+  FajlElemzesValasz,
   HaviOsszesito,
   KategoriaModositasKeres,
   NyugtaKeres,
@@ -22,7 +24,10 @@ async function keres<T>(utvonal: string, opciok: { method: 'GET' | 'POST'; body?
       body: opciok.body === undefined ? undefined : JSON.stringify(opciok.body),
       signal: vezerlo.signal,
     });
-    if (!res.ok) throw new Error(`A szerver hibát jelzett (${res.status})`);
+    if (!res.ok) {
+      const hibaTest = await res.json().catch(() => null);
+      throw new Error(hibaTest?.uzenet ?? `A szerver hibát jelzett (${res.status})`);
+    }
     return (await res.json()) as T;
   } catch (e) {
     if (e instanceof Error && e.name === 'AbortError') throw new Error('Időtúllépés');
@@ -53,6 +58,18 @@ export async function feltoltNyugta(body: NyugtaKeres): Promise<NyugtaValasz> {
       ],
     },
   };
+}
+
+/**
+ * `POST /webhook/banki-fajl-elemzes`: bármilyen banki kivonat (PDF / XLSX / CSV) elemzése a szerveren
+ * (token nélküli Python script). Csak élő módban hívható.
+ */
+export async function elemezBankiFajl(body: FajlElemzesKeres) {
+  const valasz = await keres<FajlElemzesValasz>('banki-fajl-elemzes', { method: 'POST', body });
+  if (valasz.status !== 'success' || !valasz.data) {
+    throw new Error(valasz.uzenet ?? 'A fájl elemzése nem sikerült');
+  }
+  return valasz.data;
 }
 
 /** `POST /webhook/banki-import` (a spec nem ír le válasz-szerkezetet, bármely 2xx siker). */
