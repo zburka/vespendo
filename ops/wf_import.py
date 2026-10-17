@@ -40,6 +40,8 @@ for (const t of body.tranzakciok) {
   const kulcs = apiKulcs || `${alap}#${szamlalo[alap]}`;
   if (kulcsok.has(kulcs)) { o.duplikalt++; continue; }
   const kiadas = t.irany !== 'bevetel';
+  // átutalás: PDF-nél a leírás kezdete, a banki API-nál a nem kártyás fizetési mód
+  const atutalas = apiKulcs ? t.fizetesi_mod === 'atutalas' : ATUTALAS_RE.test(nyers.trim());
 
   // 2. nyugtával párosítás: azonos összeg, a nyugta napja és +3 nap között
   if (kiadas) {
@@ -63,12 +65,12 @@ for (const t of body.tranzakciok) {
   const sz = szabalyok.find(r => szoveg.includes(r.minta));
   const sor = {
     kereskedo: (nyers || koz || 'Ismeretlen').slice(0, 200), datum: t.datum, osszeg,
-    kategoria_id: [sz?.kat || (kiadas ? (ATUTALAS_RE.test(nyers.trim()) ? ATUTALAS : EGYEB) : FIZETES)], tipus: kiadas ? 'kiadas' : 'bevetel_egyszeri', tulajdonos: sz?.tul || feltolto,
-    fizetesi_mod: /k[aá]rty/i.test(koz + ' ' + nyers) ? 'kartya' : 'atutalas', forras: 'bank_import', allapot: 'lezart',
+    kategoria_id: [sz?.kat || (kiadas ? (atutalas ? ATUTALAS : EGYEB) : FIZETES)], tipus: kiadas ? 'kiadas' : 'bevetel_egyszeri', tulajdonos: sz?.tul || feltolto,
+    fizetesi_mod: ['kartya', 'keszpenz', 'atutalas'].includes(t.fizetesi_mod) ? t.fizetesi_mod : (/k[aá]rty/i.test(koz + ' ' + nyers) ? 'kartya' : 'atutalas'), forras: 'bank_import', allapot: 'lezart',
     megjegyzes: koz.slice(0, 1000), import_kulcs: kulcs,
   };
   if (sz) o.szaballyal++;
-  else if (kiadas && !ATUTALAS_RE.test(nyers.trim())) ismeretlenek.push({ idx: uj.length, szoveg: (nyers + ' ' + koz).slice(0, 140), osszeg });
+  else if (kiadas && !atutalas) ismeretlenek.push({ idx: uj.length, szoveg: (nyers + ' ' + koz).slice(0, 140), osszeg });
   uj.push(sor);
 }
 o.uj = uj.length;

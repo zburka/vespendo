@@ -55,7 +55,7 @@ def test_normalizal_kiadas_bevetel_fuggoben_deviza():
                         "transaction_amount": {"amount": "1290.00", "currency": "HUF"}, "creditor": {"name": "Lidl"},
                         "remittance_information": ["Vásárlás", "kártyával"]})
     assert ki == {"datum": "2026-10-01", "osszeg": 1290.0, "kereskedo_nyers": "Lidl", "kozlemeny": "Vásárlás kártyával",
-                  "irany": "kiadas", "kulcs": "eb:R1", "penznem": "HUF"}
+                  "irany": "kiadas", "kulcs": "eb:R1", "penznem": "HUF", "fizetesi_mod": "atutalas"}
     be = eb.normalizal({"transaction_id": "T9", "value_date": "2026-10-02", "credit_debit_indicator": "CRDT",
                         "transaction_amount": {"amount": "500000", "currency": "HUF"}, "debtor": {"name": "Munkaadó Kft"},
                         "remittance_information": ["munkabér"]})
@@ -106,3 +106,14 @@ def test_session_letrehozas_szamla_uid(konfig, monkeypatch):
                         "accounts": [{"uid": "uuid-1", "account_id": {"iban": "HU00"}, "name": "Folyószámla"}]})
     r = eb.session_letrehozas(konfig, "kod", s)
     assert r["szemely"] == "feleseg" and r["session_id"] == "S1" and r["szamlak"][0]["uid"] == "uuid-1" and r["szamlak"][0]["iban"] == "HU00"
+
+
+def test_kartyas_vasarlas_felismerese_a_kozlemenybol():
+    kartya = eb.normalizal({"entry_reference": "K1", "booking_date": "2026-10-12", "credit_debit_indicator": "DBIT",
+                            "transaction_amount": {"amount": "750", "currency": "HUF"}, "creditor": {"name": "Inga Kulturkavezo"},
+                            "remittance_information": ["2026.10.09 6296949233 Inga Kulturkavezo        -APPLE"]})
+    assert kartya["fizetesi_mod"] == "kartya"
+    atutalas = eb.normalizal({"entry_reference": "K2", "booking_date": "2026-10-12", "credit_debit_indicator": "DBIT",
+                              "transaction_amount": {"amount": "2721", "currency": "HUF"}, "creditor": {"name": "OTP BANK NYRT."},
+                              "remittance_information": ["9801804086826482BIZT"]})
+    assert atutalas["fizetesi_mod"] == "atutalas"

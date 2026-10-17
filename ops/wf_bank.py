@@ -104,7 +104,9 @@ const aktiv = sorok.filter(r => r.aktiv && r.szamla_uid && (!r.lejarat || Date.p
 const lejart = sorok.filter(r => r.aktiv && r.lejarat && Date.parse(r.lejarat) <= Date.now()).length;
 if (!aktiv.length) return [{ json: { nincs: true, lejart } }];
 return aktiv.map(r => {
-  const alap = r.utolso_szinkron ? new Date(Date.parse(r.utolso_szinkron) - 7 * 864e5) : new Date(Date.now() - 90 * 864e5);
+  // a bank legfeljebb 89 napnyi történetet ad vissza: 88 nap a felső határ (első szinkron és hosszú kihagyás után is)
+  const legkorabbi = Date.now() - 88 * 864e5;
+  const alap = new Date(Math.max(r.utolso_szinkron ? Date.parse(r.utolso_szinkron) - 7 * 864e5 : legkorabbi, legkorabbi));
   return { json: { nincs: false, id: r.id, szemely: r.szemely, uid: r.szamla_uid, utolso: r.utolso_szinkron || '', date_from: alap.toISOString().slice(0, 10) } };
 });
 """

@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -169,6 +170,8 @@ def normalizal(t: dict) -> dict | None:
     if deviza and deviza != "HUF":
         kozlemeny = f"{kozlemeny} [{ta.get('amount')} {deviza}]".strip()
     ref = t.get("entry_reference") or t.get("transaction_id")
+    # kártyás vásárlás az OTP közleményében: 'ÉÉÉÉ.HH.NN <kártya/hivatkozás szám> <kereskedő> -APPLE'; minden más átutalás
+    kartya = bool(re.match(r"^\d{4}\.\d{2}\.\d{2}\s+\d{6,}", kozlemeny))
     return {
         "datum": datum,
         "osszeg": round(osszeg, 2),
@@ -177,6 +180,7 @@ def normalizal(t: dict) -> dict | None:
         "irany": "bevetel" if bevetel else "kiadas",
         "kulcs": f"eb:{ref}" if ref else None,
         "penznem": deviza or "HUF",
+        "fizetesi_mod": "kartya" if kartya else "atutalas",
     }
 
 
