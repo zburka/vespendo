@@ -80,7 +80,7 @@ def sorok(tid, items):
     return api('POST', f'/api/database/rows/table/{tid}/batch/?user_field_names=true', {'items': items})['items']
 
 KATEGORIAK = [('Élelmiszer', 'kiadas', 'cart'), ('Rezsi', 'kiadas', 'flash'), ('Szórakozás', 'kiadas', 'film'),
-              ('Ruházat', 'kiadas', 'shirt'), ('Közlekedés', 'kiadas', 'car'), ('Banki költségek', 'kiadas', 'bank'),
+              ('Ruházat', 'kiadas', 'shirt'), ('Étterem', 'kiadas', 'silverware-fork-knife'), ('Közlekedés', 'kiadas', 'car'), ('Banki költségek', 'kiadas', 'bank'),
               ('Egyéb', 'kiadas', 'ellipsis-horizontal'), ('Fizetés', 'bevetel', 'cash'), ('Egyéb bevétel', 'bevetel', 'cash-plus')]
 # név szerint feltölt (idempotens): a hiányzó kategóriákat létrehozza, a meglévőket nem bántja
 def sorok_lista(tid):
@@ -96,7 +96,9 @@ SZABALYOK = [('lidl', 'Élelmiszer'), ('spar', 'Élelmiszer'), ('tesco', 'Élelm
              ('mvm', 'Rezsi'), ('telekom', 'Rezsi'), ('digi', 'Rezsi'), ('netflix', 'Szórakozás'), ('spotify', 'Szórakozás'),
              ('mol ', 'Közlekedés'), ('omv', 'Közlekedés'),
              ('tranzakció költsége', 'Banki költségek'), ('megb.díj', 'Banki költségek'), ('havidíj', 'Banki költségek'),
-             ('munkabér', 'Fizetés')]
+             ('munkabér', 'Fizetés'),
+             ('pekaru', 'Élelmiszer'), ('johnny', 'Étterem'), ('mcd ', 'Étterem'), ('kfc', 'Étterem'), ('burger king', 'Étterem'),
+             ('pizzeria', 'Étterem'), ('pizza hut', 'Étterem')]
 letezo_minta = {r['minta'] for r in sorok_lista(sz)}
 uj_sz = [{'minta': m, 'kategoria_id': [kat_id[k]], 'alapertelmezett_tulajdonos': 'kozos'} for m, k in SZABALYOK if m not in letezo_minta]
 if uj_sz:

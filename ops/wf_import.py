@@ -65,39 +65,57 @@ return [{ json: { uj, patch, ismeretlenek, osszegzes: o, volt_ismeretlen: ismere
 CHUNKOK = r"""
 const lista = $('Feldolgozás').first().json.ismeretlenek;
 const out = [];
-for (let i = 0; i < lista.length; i += 60) out.push({ json: { chunk: lista.slice(i, i + 60) } });
+for (let i = 0; i < lista.length; i += 25) out.push({ json: { chunk: lista.slice(i, i + 25) } });
 return out;
 """
 
-HAIKU_BODY = ("={{ JSON.stringify({ model: 'claude-haiku-5-5', max_tokens: 700, thinking: { type: 'disabled' }, "
-  "system: 'Magyar banki tételeket sorolsz be kategóriába. Kategóriák: Élelmiszer, Rezsi, Szórakozás, Ruházat, Közlekedés, Banki költségek, Egyéb. "
-  "Bemenet soronként: sorszám|leírás|összeg. Válaszolj KIZÁRÓLAG egy JSON tömbbel, soronként egy kategórianévvel, a bemenet sorrendjében.', "
+from prompts import BESOROLAS_SYSTEM
+HAIKU_BODY = ("={{ JSON.stringify({ model: 'claude-haiku-5-5', max_tokens: 700, thinking: { type: 'disabled' }, system: "
+  + json.dumps(BESOROLAS_SYSTEM, ensure_ascii=False) + ", "
   "messages: [{ role: 'user', content: $json.chunk.map((c, i) => i + '|' + c.szoveg + '|' + c.osszeg).join('\\n') }] }) }}")
 
 OSSZEFESULES = r"""
 const alap = $('Feldolgozás').first().json;
 const uj = alap.uj;
 const KAT = %(kat)s;
+const GEN = /^(vásárlás kártyával|áruvisszavét ellenértéke|azonnali fizetés.*|napközbeni átutalás.*|tranzakció.*)$/i;
+const kulcs = (sz) => {
+  for (let r of String(sz).split(', ').map(x => x.trim()).filter(Boolean)) {
+    if (GEN.test(r) || /^[\d\W]+$/.test(r) || /\d+[,.]?\d*\s?EUR|\bEUR\b/i.test(r)) continue;
+    r = r.replace(/\s*-?apple\b.*$/i, '').replace(/\s+\d{3,}.*$/, '').replace(/\*+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (r.length >= 4) return r;
+  }
+  return null;
+};
 let hasznalt = 0;
+const tanult = {};
 if (alap.volt_ismeretlen && %(haiku)s) {
   let haiku = [];
   try { haiku = $('Haiku besorolás').all(); } catch (e) { haiku = []; }
   const chunkok = $('Chunkok').all().map(i => i.json.chunk);
+  const mintak = $('Szabályok').all().flatMap(i => i.json.results || []).map(r => String(r.minta || '').toLowerCase());
   chunkok.forEach((chunk, ci) => {
-    let nevek = [];
+    let valasz = null;
     try {
-      const szoveg = (haiku[ci]?.json?.content || []).find(b => b.type === 'text')?.text || '[]';
-      nevek = JSON.parse(szoveg.replace(/```json|```/g, '').trim());
-    } catch (e) { nevek = []; }
+      const szoveg = (haiku[ci]?.json?.content || []).find(b => b.type === 'text')?.text || '';
+      valasz = JSON.parse(szoveg.replace(/```json|```/g, '').trim());
+    } catch (e) { valasz = null; }
+    // csak teljes, sorszám-kulcsos válasz érvényes: egy hiányos válasz nem csúsztathat el besorolást
+    if (!valasz || typeof valasz !== 'object' || chunk.some((c, i) => !(String(i) in valasz))) return;
     chunk.forEach((c, i) => {
-      const id = KAT[nevek[i]];
-      if (id) { uj[c.idx].kategoria_id = [id]; hasznalt++; }
+      const nev = valasz[String(i)];
+      const id = KAT[nev];
+      if (!id || nev === 'Egyéb') return;
+      uj[c.idx].kategoria_id = [id];
+      hasznalt++;
+      const k = kulcs(uj[c.idx].kereskedo);
+      if (k && !mintak.some(m => m.includes(k) || k.includes(m)) && !(k in tanult)) tanult[k] = id;
     });
   });
 }
 const darabok = [];
 for (let i = 0; i < uj.length; i += 200) darabok.push(uj.slice(i, i + 200));
-return [{ json: { uj_darabok: darabok, ai_besorolt: hasznalt } }];
+return [{ json: { uj_darabok: darabok, ai_besorolt: hasznalt, tanult } }];
 """ % {'kat': json.dumps(KAT_ID, ensure_ascii=False), 'haiku': 'true' if HAIKU else 'false'}
 
 LETREHOZAS_ITEMEK = r"""
@@ -110,9 +128,14 @@ const out = [];
 for (let i = 0; i < p.length; i += 200) out.push({ json: { items: p.slice(i, i + 200) } });
 return out.length ? out : [{ json: { items: [] } }];
 """
+TANULT_ITEMEK = r"""
+const t = $('Összefésülés').first().json.tanult || {};
+const items = Object.entries(t).map(([minta, kat]) => ({ minta, kategoria_id: [kat], alapertelmezett_tulajdonos: 'kozos' }));
+return [{ json: { items } }];
+"""
 VALASZ = r"""
 const alap = $('Feldolgozás').first().json;
-const osz = { ...alap.osszegzes, ai_besorolt: $('Összefésülés').first().json.ai_besorolt };
+const osz = { ...alap.osszegzes, ai_besorolt: $('Összefésülés').first().json.ai_besorolt, tanult_szabaly: Object.keys($('Összefésülés').first().json.tanult || {}).length };
 const hibas = (nev) => { try { for (const i of $(nev).all()) if (!Array.isArray(i.json.items)) return true; } catch (e) {} return false; };
 if (alap.uj.length && hibas('Új sorok írása')) throw new Error('A Baserow írás sikertelen (új sorok)');
 if (alap.patch.length && hibas('Nyugták lezárása')) throw new Error('A Baserow írás sikertelen (nyugták)');
@@ -147,9 +170,13 @@ nodes += [
     if_('Van patch?', '={{ $json.items.length }}', 0, NAGYOBB, (2880, 0)),
     http('Nyugták lezárása', 'PATCH', f"{BR}{T['tranzakciok']}/batch/?user_field_names=true", (3120, -120),
          body='={{ JSON.stringify({ items: $json.items }) }}', creds=cred_baserow(), never_error=True),
-    code('Válasz összeállítása', VALASZ, (3360, 0), hiba_ag=True),
-    respond('Válasz', '={{ $json }}', (3600, 0)),
-    hiba_valasz((3360, 240)),
+    code('Tanult szabályok', TANULT_ITEMEK, (3360, 0)),
+    if_('Van tanult szabály?', '={{ $json.items.length }}', 0, NAGYOBB, (3600, 0)),
+    http('Szabályok mentése', 'POST', f"{BR}{T['szabalymotor']}/batch/?user_field_names=true", (3840, -120),
+         body='={{ JSON.stringify({ items: $json.items }) }}', creds=cred_baserow(), never_error=True),
+    code('Válasz összeállítása', VALASZ, (4080, 0), hiba_ag=True),
+    respond('Válasz', '={{ $json }}', (4320, 0)),
+    hiba_valasz((4080, 240)),
 ]
 k = {}
 osszekot(k, 'Webhook', 'Szabályok'); osszekot(k, 'Szabályok', 'Meglévő tranzakciók'); osszekot(k, 'Meglévő tranzakciók', 'Feldolgozás')
@@ -163,7 +190,9 @@ osszekot(k, 'Összefésülés', 'Létrehozás tételei'); osszekot(k, 'Létrehoz
 osszekot(k, 'Van új sor?', 'Új sorok írása', 0); osszekot(k, 'Van új sor?', 'Patch tételei', 1)
 osszekot(k, 'Új sorok írása', 'Patch tételei')
 osszekot(k, 'Patch tételei', 'Van patch?')
-osszekot(k, 'Van patch?', 'Nyugták lezárása', 0); osszekot(k, 'Van patch?', 'Válasz összeállítása', 1)
-osszekot(k, 'Nyugták lezárása', 'Válasz összeállítása'); osszekot(k, 'Válasz összeállítása', 'Válasz')
+osszekot(k, 'Van patch?', 'Nyugták lezárása', 0); osszekot(k, 'Van patch?', 'Tanult szabályok', 1)
+osszekot(k, 'Nyugták lezárása', 'Tanult szabályok'); osszekot(k, 'Tanult szabályok', 'Van tanult szabály?')
+osszekot(k, 'Van tanult szabály?', 'Szabályok mentése', 0); osszekot(k, 'Van tanult szabály?', 'Válasz összeállítása', 1)
+osszekot(k, 'Szabályok mentése', 'Válasz összeállítása'); osszekot(k, 'Válasz összeállítása', 'Válasz')
 osszekot(k, 'Feldolgozás', 'Hiba válasz', 1); osszekot(k, 'Válasz összeállítása', 'Hiba válasz', 1)
 telepit('VeSpendo – Banki import', nodes, k)

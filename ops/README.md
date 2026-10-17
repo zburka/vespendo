@@ -28,3 +28,15 @@ A parser konténer: `docker run -d --name vespendo-parser --network cloudoptima-
 Az app alapból az élő szerverhez (`https://n8n.cloudoptima.hu`) csatlakozik. Első indításkor bekéri az alkalmazás kulcsát
 (`VESPENDO_APP_KEY`), és a telefon biztonságos tárolójába menti (iOS Keychain), nincs szükség `.env` fájlra.
 Hibás kulcsnál újra bekéri. Szerver nélküli fejlesztéshez: `EXPO_PUBLIC_MOCK=1`.
+
+## Besorolás és tanulás
+Az ismeretlen kereskedőket a Claude Haiku sorolja be (`prompts.py`: közös utasítás, sorszám-kulcsos JSON válasz, teljességi
+ellenőrzéssel: hiányos válasz nem csúsztat el besorolást). Amit egyszer besorolt, azt szabályként tárolja a `szabalymotor`
+táblában, így a következő importnál ugyanaz a kereskedő már 0 tokennel kerül a helyére. Hibás besorolást az appban
+kategóriamódosítással lehet helyesbíteni (ez a szabályt is javítja).
+
+```bash
+python3 ujrabesorolas.py --alkalmaz       # banki költségek / nem munkabér bevételek (szabály alapú)
+python3 ujrabesorolas_ai.py --lista       # az Egyéb kiadások újrabesorolása AI-val, előnézet (két futás egyezése kell)
+python3 ujrabesorolas_ai.py --alkalmaz    # ugyanez, alkalmazva, a megtanult kereskedőkkel
+```
