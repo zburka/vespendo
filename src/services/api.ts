@@ -1,4 +1,4 @@
-import { N8N_APP_KEY, N8N_BASE_URL } from '../config';
+import { MOCK_MOD, N8N_APP_KEY_ENV, N8N_BASE_URL } from '../config';
 import type {
   Alapadatok,
   BankiImportKeres,
@@ -12,8 +12,23 @@ import type {
   Tranzakcio,
 } from '../types';
 
-/** Ha nincs n8n URL beállítva (EXPO_PUBLIC_N8N_BASE_URL), az app mock adatokkal működik. */
-export const ELO_API = N8N_BASE_URL !== '';
+/** Alapból élő módban fut; mock adatokkal csak `EXPO_PUBLIC_MOCK=1` esetén. */
+export const ELO_API = !MOCK_MOD;
+
+/** Az `X-App-Key` fejléc értéke. Az app indításkor tölti be a telefon biztonságos tárolójából. */
+let appKulcs = N8N_APP_KEY_ENV;
+export const setAppKulcs = (kulcs: string) => {
+  appKulcs = kulcs;
+};
+export const vanAppKulcs = () => appKulcs !== '';
+
+/** A szerver elutasította az alkalmazás kulcsát (hiányzik vagy hibás). */
+export class HibasKulcs extends Error {
+  constructor() {
+    super('Hibás vagy hiányzó alkalmazás kulcs');
+    this.name = 'HibasKulcs';
+  }
+}
 
 const IDOTUL_MS = 60_000;
 
@@ -23,10 +38,11 @@ async function keres<T>(utvonal: string, opciok: { method: 'GET' | 'POST'; body?
   try {
     const res = await fetch(`${N8N_BASE_URL}/webhook/${utvonal}`, {
       method: opciok.method,
-      headers: { 'Content-Type': 'application/json', 'X-App-Key': N8N_APP_KEY },
+      headers: { 'Content-Type': 'application/json', 'X-App-Key': appKulcs },
       body: opciok.body === undefined ? undefined : JSON.stringify(opciok.body),
       signal: vezerlo.signal,
     });
+    if (res.status === 401 || res.status === 403) throw new HibasKulcs();
     if (!res.ok) {
       const hibaTest = await res.json().catch(() => null);
       throw new Error(hibaTest?.uzenet ?? `A szerver hibát jelzett (${res.status})`);

@@ -4,17 +4,34 @@ import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { KulcsPrompt } from '../components/KulcsPrompt';
+import { ELO_API, setAppKulcs, vanAppKulcs } from '../services/api';
+import { kulcsOlvas } from '../services/kulcs';
 import { useStore } from '../store/useStore';
 
 export default function RootLayout() {
   useEffect(() => {
-    useStore.getState().betoltes();
+    (async () => {
+      if (!ELO_API) return;
+      try {
+        const tarolt = await kulcsOlvas();
+        if (tarolt) setAppKulcs(tarolt);
+      } catch {
+        // a tároló nem érhető el: az app bekéri a kulcsot
+      }
+      if (!vanAppKulcs()) {
+        useStore.getState().setKulcsSzukseges(true);
+        return;
+      }
+      useStore.getState().betoltes();
+    })();
   }, []);
 
   return (
     <SafeAreaProvider>
       <PaperProvider>
         <StatusBar style="auto" />
+        <KulcsPrompt />
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen

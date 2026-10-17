@@ -1,4 +1,13 @@
-/** n8n webhook alap URL (pl. https://n8n.cloudoptima.hu). Üres érték esetén a mock réteg válaszol. */
-export const N8N_BASE_URL = (process.env.EXPO_PUBLIC_N8N_BASE_URL ?? '').replace(/\/$/, '');
-/** A webhookok `X-App-Key` fejléce. Nem titok a szó szigorú értelmében (az app csomagjában van), csak elriasztja a véletlen hívásokat. */
-export const N8N_APP_KEY = process.env.EXPO_PUBLIC_N8N_APP_KEY ?? '';
+/**
+ * n8n webhook alap URL. A szerver címe nem titok, ezért alapértelmezetten be van égetve;
+ * `EXPO_PUBLIC_N8N_BASE_URL` felülírja (pl. teszt szerverre).
+ */
+export const N8N_BASE_URL = (
+  process.env.EXPO_PUBLIC_N8N_BASE_URL || 'https://n8n.cloudoptima.hu'
+).replace(/\/$/, '');
+
+/** Mock mód (szerver nélküli fejlesztés): `EXPO_PUBLIC_MOCK=1`. */
+export const MOCK_MOD = process.env.EXPO_PUBLIC_MOCK === '1';
+
+/** Fejlesztői kényelem: az `X-App-Key` megadható környezeti változóval is; különben az app első indításkor kéri. */
+export const N8N_APP_KEY_ENV = process.env.EXPO_PUBLIC_N8N_APP_KEY ?? '';

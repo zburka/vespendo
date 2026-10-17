@@ -34,7 +34,8 @@
           "photosPermission": "A VeSpendo a képtárból tölti fel a nyugtákat.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

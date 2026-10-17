@@ -42,7 +42,7 @@ export default function ImportScreen() {
         } else {
           if (!/\.csv$/i.test(nev ?? '')) {
             throw new Error(
-              'Mock módban csak CSV olvasható. PDF/XLSX-hez állítsd be az n8n URL-t.',
+              'Az app mock módban fut (EXPO_PUBLIC_MOCK=1), ezért csak CSV olvasható. Töröld ezt a beállítást, és indítsd újra az appot.',
             );
           }
           const csv = parseBankiCsv(dekodol(await new File(uri).bytes()));

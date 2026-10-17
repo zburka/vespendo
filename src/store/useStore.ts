@@ -13,6 +13,7 @@ import {
   celMentes,
   celTorles,
   ELO_API,
+  HibasKulcs,
   keretMentes,
   tranzakciokLekeres,
 } from '../services/api';
@@ -44,6 +45,9 @@ interface State {
   /** Élő módban: töltés állapota és az utolsó hiba. */
   toltes: boolean;
   hiba: string | null;
+  /** Az n8n elutasította a kulcsot (vagy nincs): az app bekéri. */
+  kulcsSzukseges: boolean;
+  setKulcsSzukseges: (ertek: boolean) => void;
   /** Élő módban a szerverről (n8n) tölti be az adatokat; mock módban nem csinál semmit. */
   betoltes: () => Promise<void>;
   /** Keret létrehozása/módosítása egy kategóriára (élő módban a szerverre is ment, majd újratölt). */
@@ -74,6 +78,8 @@ export const useStore = create<State>((set, get) => ({
   szabalyok: ELO_API ? [] : SZABALYOK,
   toltes: false,
   hiba: null,
+  kulcsSzukseges: false,
+  setKulcsSzukseges: (kulcsSzukseges) => set({ kulcsSzukseges }),
   betoltes: async () => {
     if (!ELO_API) return;
     set({ toltes: true, hiba: null });
@@ -81,6 +87,10 @@ export const useStore = create<State>((set, get) => ({
       const [alap, tr] = await Promise.all([alapadatok(), tranzakciokLekeres()]);
       set({ ...alap, tranzakciok: tr.tranzakciok, toltes: false });
     } catch (e) {
+      if (e instanceof HibasKulcs) {
+        set({ toltes: false, kulcsSzukseges: true });
+        return;
+      }
       set({
         toltes: false,
         hiba: e instanceof Error ? e.message : 'Az adatok betöltése nem sikerült',

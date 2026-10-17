@@ -22,3 +22,8 @@ python3 wf_keretek.py           # POST /webhook/keret-mentes, /cel-mentes, /cel-
 A webhookok `X-App-Key` fejlécet várnak. A Haiku / Sonnet lépések akkor épülnek be, ha az n8n-ben létezik a
 `VeSpendo Anthropic (x-api-key)` hitelesítő (és szerepel az `n8n_cred.json`-ban), majd a workflow scriptek újra lefutnak.
 A parser konténer: `docker run -d --name vespendo-parser --network cloudoptima-net -e PARSER_API_KEY=... vespendo-parser`.
+
+## Az app és a kulcs
+Az app alapból az élő szerverhez (`https://n8n.cloudoptima.hu`) csatlakozik. Első indításkor bekéri az alkalmazás kulcsát
+(`VESPENDO_APP_KEY`), és a telefon biztonságos tárolójába menti (iOS Keychain), nincs szükség `.env` fájlra.
+Hibás kulcsnál újra bekéri. Szerver nélküli fejlesztéshez: `EXPO_PUBLIC_MOCK=1`.
