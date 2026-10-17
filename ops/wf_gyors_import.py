@@ -5,13 +5,20 @@ APPKULCS = {'httpHeaderAuth': {'id': CRED['VeSpendo App (X-App-Key)'], 'name': '
 PARSER = {'httpHeaderAuth': {'id': CRED['VeSpendo Parser (API key)'], 'name': 'VeSpendo Parser (API key)'}}
 
 ELOKESZIT = r"""
-const b = $('Webhook').first().json.body || {};
-if (!b.fajl_base64) throw new Error('Hiányzik a fájl (fajl_base64)');
-return [{ json: {
-  fajl_nev: String(b.fajl_nev || 'kivonat.pdf'),
-  fajl_base64: String(b.fajl_base64),
-  feltolto: b.feltolto === 'feleseg' ? 'feleseg' : 'ferj',
-} }];
+// JSON ({fajl_nev, fajl_base64, feltolto}) VAGY nyers fájl a kérés törzsében (iOS Parancsok: törzs = Fájl)
+const w = $('Webhook').first();
+const b = w.json.body || {};
+const q = w.json.query || {};
+let base64 = b.fajl_base64;
+let nev = b.fajl_nev;
+if (!base64 && w.binary && w.binary.data) {
+  const buf = await this.helpers.getBinaryDataBuffer(0, 'data');
+  base64 = buf.toString('base64');
+  nev = nev || w.binary.data.fileName || q.nev || 'kivonat.pdf';
+}
+if (!base64) throw new Error('Hiányzik a fájl: küldd a fájlt a kérés törzsében, vagy JSON-ban fajl_base64 mezőként');
+const feltolto = (b.feltolto || q.feltolto) === 'feleseg' ? 'feleseg' : 'ferj';
+return [{ json: { fajl_nev: String(nev || 'kivonat.pdf'), fajl_base64: String(base64), feltolto } }];
 """
 ATADAS = r"""
 const e = $('Előkészítés').first().json;
