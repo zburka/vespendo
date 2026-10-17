@@ -80,7 +80,7 @@ def sorok(tid, items):
     return api('POST', f'/api/database/rows/table/{tid}/batch/?user_field_names=true', {'items': items})['items']
 
 KATEGORIAK = [('Élelmiszer', 'kiadas', 'cart'), ('Rezsi', 'kiadas', 'flash'), ('Szórakozás', 'kiadas', 'film'),
-              ('Ruházat', 'kiadas', 'shirt'), ('Étterem', 'kiadas', 'silverware-fork-knife'), ('Közlekedés', 'kiadas', 'car'), ('Banki költségek', 'kiadas', 'bank'),
+              ('Ruházat', 'kiadas', 'shirt'), ('Étterem', 'kiadas', 'silverware-fork-knife'), ('Közlekedés', 'kiadas', 'car'), ('Egészség', 'kiadas', 'heart-pulse'), ('Előfizetés', 'kiadas', 'calendar-sync'), ('Banki költségek', 'kiadas', 'bank'),
               ('Egyéb', 'kiadas', 'ellipsis-horizontal'), ('Fizetés', 'bevetel', 'cash'), ('Egyéb bevétel', 'bevetel', 'cash-plus')]
 # név szerint feltölt (idempotens): a hiányzó kategóriákat létrehozza, a meglévőket nem bántja
 def sorok_lista(tid):
@@ -94,15 +94,23 @@ kat_id = {r['nev']: r['id'] for r in sorok_lista(kat)}
 
 SZABALYOK = [('lidl', 'Élelmiszer'), ('spar', 'Élelmiszer'), ('tesco', 'Élelmiszer'), ('aldi', 'Élelmiszer'), ('kifli', 'Élelmiszer'),
              ('mvm', 'Rezsi'), ('telekom', 'Rezsi'), ('digi', 'Rezsi'), ('netflix', 'Szórakozás'), ('spotify', 'Szórakozás'),
-             ('mol ', 'Közlekedés'), ('omv', 'Közlekedés'),
+             ('mol', 'Közlekedés'), ('omv', 'Közlekedés'),
              ('tranzakció költsége', 'Banki költségek'), ('megb.díj', 'Banki költségek'), ('havidíj', 'Banki költségek'),
              ('munkabér', 'Fizetés'),
-             ('pekaru', 'Élelmiszer'), ('johnny', 'Étterem'), ('mcd ', 'Étterem'), ('kfc', 'Étterem'), ('burger king', 'Étterem'),
-             ('pizzeria', 'Étterem'), ('pizza hut', 'Étterem')]
-letezo_minta = {r['minta'] for r in sorok_lista(sz)}
+             ('pekaru', 'Élelmiszer'), ('johnny', 'Étterem'), ('mcd', 'Étterem'), ('kfc', 'Étterem'), ('burger king', 'Étterem'),
+             ('pizzeria', 'Étterem'), ('pizza hut', 'Étterem'),
+             ('patika', 'Egészség'), ('gyógyszertár', 'Egészség'), ('apple.com/bill', 'Előfizetés'), ('google workspace', 'Előfizetés'),
+             ('claude.ai', 'Előfizetés'), ('youtube', 'Előfizetés')]
+# meglévő szabályok kategóriájának felülírása (a streaming mostantól Előfizetés)
+FELULIR = {'netflix': 'Előfizetés', 'spotify': 'Előfizetés'}
+letezo_minta = {str(r['minta']).strip() for r in sorok_lista(sz)}
 uj_sz = [{'minta': m, 'kategoria_id': [kat_id[k]], 'alapertelmezett_tulajdonos': 'kozos'} for m, k in SZABALYOK if m not in letezo_minta]
 if uj_sz:
     sorok(sz, uj_sz)
+for r in sorok_lista(sz):
+    uj_kat_id = kat_id.get(FELULIR.get(r['minta']))
+    if uj_kat_id and [x['id'] for x in r['kategoria_id']] != [uj_kat_id]:
+        api('PATCH', f"/api/database/rows/table/{sz}/{r['id']}/?user_field_names=true", {'kategoria_id': [uj_kat_id]})
 
 # --- saját adatbázis-token a VeSpendo munkaterülethez
 tokenek = api('GET', '/api/database/tokens/')

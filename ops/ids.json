@@ -19,6 +19,8 @@
   "Fizetés": 7,
   "Banki költségek": 8,
   "Egyéb bevétel": 9,
-  "Étterem": 10
+  "Étterem": 10,
+  "Egészség": 11,
+  "Előfizetés": 12
  }
 }

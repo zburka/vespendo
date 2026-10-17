@@ -13,6 +13,8 @@ export const KATEGORIAK: Kategoria[] = [
   { id: 'kat_szorakozas', nev: 'Szórakozás', tipus: 'kiadas', ikon: 'film' },
   { id: 'kat_ruhazat', nev: 'Ruházat', tipus: 'kiadas', ikon: 'shirt' },
   { id: 'kat_egyeb', nev: 'Egyéb', tipus: 'kiadas', ikon: 'ellipsis-horizontal' },
+  { id: 'kat_egeszseg', nev: 'Egészség', tipus: 'kiadas', ikon: 'heart-pulse' },
+  { id: 'kat_elofizetes', nev: 'Előfizetés', tipus: 'kiadas', ikon: 'calendar-sync' },
   { id: 'kat_banki', nev: 'Banki költségek', tipus: 'kiadas', ikon: 'bank' },
   { id: 'kat_fizetes', nev: 'Fizetés', tipus: 'bevetel', ikon: 'cash' },
   { id: 'kat_egyeb_bev', nev: 'Egyéb bevétel', tipus: 'bevetel', ikon: 'cash-plus' },

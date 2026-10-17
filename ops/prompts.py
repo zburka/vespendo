@@ -1,12 +1,14 @@
 """A Haiku besorolás közös utasítása (n8n import workflow és az egyszeri újrabesorolás is ezt használja)."""
-KATEGORIAK = ['Élelmiszer', 'Étterem', 'Rezsi', 'Szórakozás', 'Ruházat', 'Közlekedés', 'Banki költségek', 'Egyéb']
+KATEGORIAK = ['Élelmiszer', 'Étterem', 'Rezsi', 'Szórakozás', 'Ruházat', 'Közlekedés', 'Egészség', 'Előfizetés', 'Banki költségek', 'Egyéb']
 
 BESOROLAS_SYSTEM = (
     'Magyar banki tételeket sorolsz be kategóriába a kereskedő neve alapján. Kategóriák: ' + ', '.join(KATEGORIAK) + '. '
     'Útmutató: Élelmiszer = élelmiszerbolt, pékség, hentes, zöldséges, piac, online bevásárlás, drogéria; '
     'Étterem = étterem, gyorsétterem, kávézó, bár, pizzéria, ételrendelés, cukrászda; '
     'Közlekedés = üzemanyag, parkolás, taxi, tömegközlekedés, autópálya; Rezsi = áram, gáz, víz, internet, telefon; '
-    'Szórakozás = streaming, mozi, játék, sport, hobbi; Ruházat = ruha, cipő, sportbolt; '
+    'Szórakozás = mozi, játék, sport, hobbi, szabadidő; Ruházat = ruha, cipő, sportbolt; '
+    'Egészség = patika, gyógyszertár, orvos, fogorvos, optika, gyógyászati termék; '
+    'Előfizetés = rendszeres online vagy szoftver előfizetés (streaming, zene, Apple/Google szolgáltatások, felhő, edzőterem bérlet); '
     'Banki költségek = bankdíjak, tranzakciós költségek; Egyéb = ami nem illik sehova (pl. magánszemélyeknek utalás, hitel, törlesztés). '
     'Bemenet soronként: sorszám|leírás|összeg. Válaszolj KIZÁRÓLAG egy JSON objektummal, amelynek kulcsa a sorszám (szövegként), értéke a kategória neve, '
     'és MINDEN bemeneti sorszám szerepel benne, pl. {"0":"Élelmiszer","1":"Egyéb"}.'
