@@ -11,11 +11,12 @@ ANTHROPIC = {'httpHeaderAuth': {'id': CRED.get(HAIKU_NEV), 'name': HAIKU_NEV}}
 FELDOLGOZAS = r"""
 const body = $('Webhook').first().json.body || {};
 if (!Array.isArray(body.tranzakciok)) throw new Error('Hiányzó tranzakciok lista');
-const feltolto = body.feltolto === 'feleseg' ? 'feleseg' : 'ferj';
+if (!/^[a-z0-9_]{1,30}$/.test(String(body.feltolto || ''))) throw new Error('Érvénytelen vagy hiányzó feltoltő (a személy kulcsa kell)');
+const feltolto = body.feltolto;
 const EGYEB = %(egyeb)d, FIZETES = %(fizetes)d;
 
 const szabalyok = $('Szabályok').all().flatMap(i => i.json.results || [])
-  .map(r => ({ minta: String(r.minta || '').toLowerCase(), kat: r.kategoria_id?.[0]?.id, tul: r.alapertelmezett_tulajdonos?.value }))
+  .map(r => ({ minta: String(r.minta || '').toLowerCase(), kat: r.kategoria_id?.[0]?.id, tul: r.alapertelmezett_tulajdonos || '' }))
   .filter(r => r.minta && r.kat)
   .sort((a, b) => b.minta.length - a.minta.length);
 const meglevo = $('Meglévő tranzakciók').all().flatMap(i => i.json.results || []);
@@ -130,7 +131,7 @@ return out.length ? out : [{ json: { items: [] } }];
 """
 TANULT_ITEMEK = r"""
 const t = $('Összefésülés').first().json.tanult || {};
-const items = Object.entries(t).map(([minta, kat]) => ({ minta, kategoria_id: [kat], alapertelmezett_tulajdonos: 'kozos' }));
+const items = Object.entries(t).map(([minta, kat]) => ({ minta, kategoria_id: [kat] }));
 return [{ json: { items } }];
 """
 VALASZ = r"""

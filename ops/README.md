@@ -18,7 +18,7 @@ python3 wf_nyugta.py            # POST /webhook/nyugta-feltoltes  (AI hitelesít
 python3 wf_gyors_import.py      # POST /webhook/banki-fajl-gyors-import  (elemzés + import egy hívásban, iOS Parancsok)
 python3 wf_keretek.py           # POST /webhook/keret-mentes, /cel-mentes, /cel-torles
 python3 wf_felvetel.py          # POST /webhook/tranzakcio-felvetel (kézi tétel)
-python3 wf_szerkesztok.py       # POST /webhook/elofizetes-mentes, /elofizetes-torles, /tranzakcio-modositas, /tranzakcio-torles
+python3 wf_szerkesztok.py       # POST /webhook/elofizetes-mentes, /elofizetes-torles, /tranzakcio-modositas, /tranzakcio-torles, /szemely-mentes
 ```
 
 A webhookok `X-App-Key` fejlécet várnak. A Haiku / Sonnet lépések akkor épülnek be, ha az n8n-ben létezik a
@@ -41,3 +41,9 @@ python3 ujrabesorolas.py --alkalmaz       # banki költségek / nem munkabér be
 python3 ujrabesorolas_ai.py --lista       # az Egyéb kiadások újrabesorolása AI-val, előnézet (két futás egyezése kell)
 python3 ujrabesorolas_ai.py --alkalmaz    # ugyanez, alkalmazva, a megtanult kereskedőkkel
 ```
+
+## Személyek
+A tételek `tulajdonos` mezője a személy **kulcsát** tárolja (szöveg), a `szemelyek` tábla adja a nevét és az aktív állapotát.
+A „Közös” is egy személy (`kozos`). Átnevezés: a `szemelyek` tábla `nev` mezője (vagy az appban a Beállítások fülön), a
+tételek nem változnak. Új személy a `szemely-mentes` végponttal (az app Beállítások → Új személy) vagy a Baserow-ban vehető fel.
+Az import a tulajdonost mindig a feltöltőre állítja (a szabályok alapértelmezett tulajdonosa üres, hacsak nem adtad meg).

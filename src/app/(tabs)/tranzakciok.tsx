@@ -2,15 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { SectionList, StyleSheet, View } from 'react-native';
-import { Divider, List, SegmentedButtons, Text, useTheme } from 'react-native-paper';
+import { Chip, Divider, List, Text, useTheme } from 'react-native-paper';
 
 import { AdatAllapot } from '../../components/AdatAllapot';
 import { HonapValaszto } from '../../components/HonapValaszto';
-import { type TulajdonosSzuro, useStore } from '../../store/useStore';
+import { SzemelyValaszto } from '../../components/SzemelyValaszto';
+import { useStore } from '../../store/useStore';
 import type { Tranzakcio } from '../../types';
 import { formatFt, formatNap } from '../../utils/format';
-
-const TULAJDONOS_CIMKE = { kozos: 'Közös', ferj: 'Férj', feleseg: 'Feleség' } as const;
+import { szemelyNev } from '../../utils/szemely';
 
 export default function TranzakciokScreen() {
   const theme = useTheme();
@@ -19,34 +19,41 @@ export default function TranzakciokScreen() {
   const szuro = useStore((s) => s.szuro);
   const setSzuro = useStore((s) => s.setSzuro);
   const tranzakciok = useStore((s) => s.tranzakciok);
+  const szemelyek = useStore((s) => s.szemelyek);
+  const kategoriaSzuro = useStore((s) => s.kategoriaSzuro);
+  const setKategoriaSzuro = useStore((s) => s.setKategoriaSzuro);
   const kategoriak = useStore((s) => s.kategoriak);
   const toltes = useStore((s) => s.toltes);
   const betoltes = useStore((s) => s.betoltes);
 
   const szekciok = useMemo(() => {
     const lista = tranzakciok
-      .filter((t) => t.datum.startsWith(honap) && (szuro === 'mind' || t.tulajdonos === szuro))
+      .filter(
+        (t) =>
+          t.datum.startsWith(honap) &&
+          (szuro === 'mind' || t.tulajdonos === szuro) &&
+          (!kategoriaSzuro || t.kategoria_id === kategoriaSzuro),
+      )
       .sort((a, b) => b.datum.localeCompare(a.datum));
     const csoportok = new Map<string, Tranzakcio[]>();
     for (const t of lista) csoportok.set(t.datum, [...(csoportok.get(t.datum) ?? []), t]);
     return [...csoportok].map(([datum, data]) => ({ title: formatNap(datum), data }));
-  }, [tranzakciok, honap, szuro]);
+  }, [tranzakciok, honap, szuro, kategoriaSzuro]);
+  const szuroKategoria = kategoriak.find((k) => k.id === kategoriaSzuro);
 
   return (
     <View style={styles.container}>
       <View style={styles.fejlec}>
         <HonapValaszto />
         <AdatAllapot />
-        <SegmentedButtons
-          value={szuro}
-          onValueChange={(v) => setSzuro(v as TulajdonosSzuro)}
-          buttons={[
-            { value: 'mind', label: 'Mind' },
-            { value: 'kozos', label: 'Közös' },
-            { value: 'ferj', label: 'Férj' },
-            { value: 'feleseg', label: 'Feleség' },
-          ]}
-        />
+        <SzemelyValaszto ertek={szuro} onChange={setSzuro} mind />
+        {szuroKategoria && (
+          <View style={styles.szuroSor}>
+            <Chip icon="filter" onClose={() => setKategoriaSzuro(null)}>
+              Kategória: {szuroKategoria.nev}
+            </Chip>
+          </View>
+        )}
       </View>
       <SectionList
         sections={szekciok}
@@ -70,7 +77,7 @@ export default function TranzakciokScreen() {
           return (
             <List.Item
               title={item.kereskedo}
-              description={`${kat?.nev ?? '?'} · ${TULAJDONOS_CIMKE[item.tulajdonos]}${
+              description={`${kat?.nev ?? '?'} · ${szemelyNev(szemelyek, item.tulajdonos)}${
                 item.fizetesi_mod === 'keszpenz' ? ' · készpénz' : ''
               }${item.allapot === 'banki_egyeztetesre_var' ? ' · egyeztetésre vár' : ''}`}
               left={(p) => (
@@ -105,6 +112,7 @@ export default function TranzakciokScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   fejlec: { padding: 16, paddingBottom: 8, gap: 8 },
+  szuroSor: { flexDirection: 'row' },
   szekcio: { paddingHorizontal: 16, paddingVertical: 6 },
   ikon: { alignSelf: 'center', marginLeft: 8 },
   ures: { textAlign: 'center', marginTop: 32 },

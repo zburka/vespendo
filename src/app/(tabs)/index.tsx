@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Button, Card, ProgressBar, Text, useTheme } from 'react-native-paper';
 
@@ -17,6 +17,45 @@ export default function DashboardScreen() {
   const router = useRouter();
   const tranzakciok = useStore((s) => s.tranzakciok);
   const keszpenz = useMemo(() => keszpenzAllapot(tranzakciok), [tranzakciok]);
+  const honap = useStore((s) => s.honap);
+  const kategoriak = useStore((s) => s.kategoriak);
+  const szemelyek = useStore((s) => s.szemelyek);
+  const setSzuro = useStore((s) => s.setSzuro);
+  const setKategoriaSzuro = useStore((s) => s.setKategoriaSzuro);
+
+  // a hónap kiadásai kategóriánként (a lista alapja a kategóriára szűréshez)
+  const kategoriaBontas = useMemo(() => {
+    const osszegek = new Map<string, number>();
+    for (const t of tranzakciok) {
+      if (t.tipus === 'kiadas' && t.datum.startsWith(honap)) {
+        osszegek.set(t.kategoria_id, (osszegek.get(t.kategoria_id) ?? 0) + t.osszeg);
+      }
+    }
+    return [...osszegek]
+      .map(([id, osszeg]) => ({ id, nev: kategoriak.find((k) => k.id === id)?.nev ?? '?', osszeg }))
+      .sort((a, b) => b.osszeg - a.osszeg);
+  }, [tranzakciok, honap, kategoriak]);
+  const kategoriaOsszeg = kategoriaBontas.reduce((s, k) => s + k.osszeg, 0);
+
+  const bontas: Record<string, number> = o.bontas_szemely_szerint ?? {};
+  const szemelySorok = [
+    ...szemelyek.filter((p) => p.aktiv || (bontas[p.kulcs] ?? 0) > 0),
+    ...Object.keys(bontas)
+      .filter((kulcs) => !szemelyek.some((p) => p.kulcs === kulcs))
+      .map((kulcs) => ({ kulcs, nev: kulcs, aktiv: true })),
+  ];
+
+  const szuresKategoriara = (id?: string) => {
+    if (!id) return;
+    setSzuro('mind');
+    setKategoriaSzuro(id);
+    router.navigate('/tranzakciok');
+  };
+  const szuresSzemelyre = (kulcs: string) => {
+    setKategoriaSzuro(null);
+    setSzuro(kulcs);
+    router.navigate('/tranzakciok');
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -74,27 +113,49 @@ export default function DashboardScreen() {
       <Card>
         <Card.Title title="Kiadások tulajdonos szerint" />
         <Card.Content style={styles.lista}>
-          {(
-            [
-              ['Közös', 'kozos'],
-              ['Férj', 'ferj_sajat'],
-              ['Feleség', 'feleseg_sajat'],
-            ] as const
-          ).map(([cimke, kulcs]) => {
-            const ertek = o.bontas_tulajdonos_szerint[kulcs];
+          {szemelySorok.map((p) => {
+            const ertek = bontas[p.kulcs] ?? 0;
             return (
-              <View key={kulcs} style={styles.keret}>
+              <Pressable key={p.kulcs} onPress={() => szuresSzemelyre(p.kulcs)}>
+                <View style={styles.keret}>
+                  <View style={styles.keretFejlec}>
+                    <Text variant="bodyLarge">{p.nev}</Text>
+                    <Text variant="bodySmall">{formatFt(ertek)}</Text>
+                  </View>
+                  <ProgressBar
+                    progress={o.osszes_kiadas > 0 ? ertek / o.osszes_kiadas : 0}
+                    style={styles.sav}
+                  />
+                </View>
+              </Pressable>
+            );
+          })}
+        </Card.Content>
+      </Card>
+
+      <Card>
+        <Card.Title
+          title="Kiadások kategóriánként"
+          subtitle="Koppints egy kategóriára a tételek megtekintéséhez"
+        />
+        <Card.Content style={styles.lista}>
+          {kategoriaBontas.length === 0 && (
+            <Text variant="bodyMedium">Ebben a hónapban nincs kiadás.</Text>
+          )}
+          {kategoriaBontas.map((k) => (
+            <Pressable key={k.id} onPress={() => szuresKategoriara(k.id)}>
+              <View style={styles.keret}>
                 <View style={styles.keretFejlec}>
-                  <Text variant="bodyLarge">{cimke}</Text>
-                  <Text variant="bodySmall">{formatFt(ertek)}</Text>
+                  <Text variant="bodyLarge">{k.nev}</Text>
+                  <Text variant="bodySmall">{formatFt(k.osszeg)}</Text>
                 </View>
                 <ProgressBar
-                  progress={o.osszes_kiadas > 0 ? ertek / o.osszes_kiadas : 0}
+                  progress={kategoriaOsszeg > 0 ? k.osszeg / kategoriaOsszeg : 0}
                   style={styles.sav}
                 />
               </View>
-            );
-          })}
+            </Pressable>
+          ))}
         </Card.Content>
       </Card>
 
@@ -114,19 +175,24 @@ export default function DashboardScreen() {
         <Card.Title title="Költségkeretek" />
         <Card.Content style={styles.lista}>
           {o.keretek.map((k) => (
-            <View key={k.kategoria} style={styles.keret}>
-              <View style={styles.keretFejlec}>
-                <Text variant="bodyLarge">{k.kategoria}</Text>
-                <Text variant="bodySmall">
-                  {formatFt(k.elkoltve)} / {formatFt(k.havi_keret)} ({k.szazalek}%)
-                </Text>
+            <Pressable
+              key={k.kategoria}
+              onPress={() => szuresKategoriara(kategoriak.find((c) => c.nev === k.kategoria)?.id)}
+            >
+              <View style={styles.keret}>
+                <View style={styles.keretFejlec}>
+                  <Text variant="bodyLarge">{k.kategoria}</Text>
+                  <Text variant="bodySmall">
+                    {formatFt(k.elkoltve)} / {formatFt(k.havi_keret)} ({k.szazalek}%)
+                  </Text>
+                </View>
+                <ProgressBar
+                  progress={Math.min(k.szazalek / 100, 1)}
+                  color={keretSzin(k.szazalek)}
+                  style={styles.sav}
+                />
               </View>
-              <ProgressBar
-                progress={Math.min(k.szazalek / 100, 1)}
-                color={keretSzin(k.szazalek)}
-                style={styles.sav}
-              />
-            </View>
+            </Pressable>
           ))}
         </Card.Content>
       </Card>

@@ -4,6 +4,7 @@ import type {
   Koltsegkeret,
   MegtakaritasiCel,
   Szabaly,
+  Szemely,
   Tranzakcio,
 } from '../types';
 
@@ -227,14 +228,19 @@ export const AI_ELEMZESEK: Record<string, string> = {
 
 /** A `szabalymotor` tábla induló tartalma (0 tokenes kategorizálás). */
 export const SZABALYOK: Szabaly[] = [
-  { id: 'sz1', minta: 'lidl', kategoria_id: 'kat_elelmiszer', alapertelmezett_tulajdonos: 'kozos' },
-  { id: 'sz2', minta: 'spar', kategoria_id: 'kat_elelmiszer', alapertelmezett_tulajdonos: 'kozos' },
-  { id: 'sz3', minta: 'mvm', kategoria_id: 'kat_rezsi', alapertelmezett_tulajdonos: 'kozos' },
-  { id: 'sz4', minta: 'telekom', kategoria_id: 'kat_rezsi', alapertelmezett_tulajdonos: 'kozos' },
+  { id: 'sz1', minta: 'lidl', kategoria_id: 'kat_elelmiszer' },
+  { id: 'sz2', minta: 'spar', kategoria_id: 'kat_elelmiszer' },
+  { id: 'sz3', minta: 'mvm', kategoria_id: 'kat_rezsi' },
+  { id: 'sz4', minta: 'telekom', kategoria_id: 'kat_rezsi' },
   {
     id: 'sz5',
     minta: 'netflix',
     kategoria_id: 'kat_szorakozas',
-    alapertelmezett_tulajdonos: 'kozos',
   },
+];
+
+export const SZEMELYEK: Szemely[] = [
+  { kulcs: 'kozos', nev: 'Közös', aktiv: true },
+  { kulcs: 'ferj', nev: 'Férj', aktiv: true },
+  { kulcs: 'feleseg', nev: 'Feleség', aktiv: true },
 ];

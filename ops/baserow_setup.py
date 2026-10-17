@@ -46,7 +46,7 @@ mezo(tr, 'datum', 'date', date_format='ISO', date_include_time=False)
 mezo(tr, 'osszeg', 'number', **SZAM)
 mezo(tr, 'kategoria_id', 'link_row', link_row_table_id=kat, has_related_field=False)
 mezo(tr, 'tipus', 'single_select', **valaszto('kiadas', 'bevetel_rendszeres', 'bevetel_egyszeri'))
-mezo(tr, 'tulajdonos', 'single_select', **valaszto('kozos', 'ferj', 'feleseg'))
+mezo(tr, 'tulajdonos', 'text')  # a személy kulcsa (szemelyek tábla), pl. kozos / ferj / feleseg / gyerek
 mezo(tr, 'fizetesi_mod', 'single_select', **valaszto('kartya', 'keszpenz', 'atutalas'))
 mezo(tr, 'forras', 'single_select', **valaszto('bank_import', 'nyugta_foto', 'kezi'))
 mezo(tr, 'allapot', 'single_select', **valaszto('lezart', 'banki_egyeztetesre_var'))
@@ -56,7 +56,18 @@ mezo(tr, 'import_kulcs', 'text')  # duplikáció-védelem újraimportnál (datum
 
 sz = tabla('szabalymotor', 'minta')
 mezo(sz, 'kategoria_id', 'link_row', link_row_table_id=kat, has_related_field=False)
-mezo(sz, 'alapertelmezett_tulajdonos', 'single_select', **valaszto('kozos', 'ferj', 'feleseg'))
+mezo(sz, 'alapertelmezett_tulajdonos', 'text')  # üres = az import feltöltője
+
+# --- személyek (a tulajdonos kulcsainak nevei; átnevezhető, bővíthető)
+sem = tabla('szemelyek', 'kulcs')
+mezo(sem, 'nev', 'text')
+mezo(sem, 'aktiv', 'boolean')
+
+# meglévő telepítés: a tulajdonos single_select mezők szöveggé alakítása (az értékek megmaradnak)
+for tid, nev in ((tr, 'tulajdonos'), (sz, 'alapertelmezett_tulajdonos')):
+    f = mezok(tid)[nev]
+    if f['type'] != 'text':
+        api('PATCH', f"/api/database/fields/{f['id']}/", {'type': 'text'})
 
 kk = tabla('koltsegkeretek', 'nev')
 mezo(kk, 'kategoria_id', 'link_row', link_row_table_id=kat, has_related_field=False)
@@ -104,13 +115,17 @@ SZABALYOK = [('lidl', 'Élelmiszer'), ('spar', 'Élelmiszer'), ('tesco', 'Élelm
 # meglévő szabályok kategóriájának felülírása (a streaming mostantól Előfizetés)
 FELULIR = {'netflix': 'Előfizetés', 'spotify': 'Előfizetés'}
 letezo_minta = {str(r['minta']).strip() for r in sorok_lista(sz)}
-uj_sz = [{'minta': m, 'kategoria_id': [kat_id[k]], 'alapertelmezett_tulajdonos': 'kozos'} for m, k in SZABALYOK if m not in letezo_minta]
+uj_sz = [{'minta': m, 'kategoria_id': [kat_id[k]]} for m, k in SZABALYOK if m not in letezo_minta]
 if uj_sz:
     sorok(sz, uj_sz)
 for r in sorok_lista(sz):
     uj_kat_id = kat_id.get(FELULIR.get(r['minta']))
     if uj_kat_id and [x['id'] for x in r['kategoria_id']] != [uj_kat_id]:
         api('PATCH', f"/api/database/rows/table/{sz}/{r['id']}/?user_field_names=true", {'kategoria_id': [uj_kat_id]})
+
+if not sorok_lista(sem):
+    sorok(sem, [{'kulcs': 'kozos', 'nev': 'Közös', 'aktiv': True}, {'kulcs': 'ferj', 'nev': 'Férj', 'aktiv': True},
+                {'kulcs': 'feleseg', 'nev': 'Feleség', 'aktiv': True}])
 
 # --- saját adatbázis-token a VeSpendo munkaterülethez
 tokenek = api('GET', '/api/database/tokens/')

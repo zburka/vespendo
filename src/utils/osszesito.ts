@@ -40,6 +40,10 @@ export function szamolHaviOsszesito(b: Bemenet): HaviOsszesito {
     osszes_bevetel,
     osszes_kiadas,
     egyenleg: osszes_bevetel - osszes_kiadas,
+    bontas_szemely_szerint: kiadasok.reduce<Record<string, number>>((m, t) => {
+      m[t.tulajdonos] = (m[t.tulajdonos] ?? 0) + t.osszeg;
+      return m;
+    }, {}),
     bontas_tulajdonos_szerint: {
       kozos: sum(kiadasok.filter((t) => t.tulajdonos === 'kozos')),
       ferj_sajat: sum(kiadasok.filter((t) => t.tulajdonos === 'ferj')),

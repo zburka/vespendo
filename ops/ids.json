@@ -7,7 +7,8 @@
   "szabalymotor": 538,
   "koltsegkeretek": 539,
   "elofizetesek": 540,
-  "megtakaritasi_celok": 541
+  "megtakaritasi_celok": 541,
+  "szemelyek": 542
  },
  "kategoriak": {
   "Élelmiszer": 1,

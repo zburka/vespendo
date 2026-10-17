@@ -4,6 +4,7 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Chip, SegmentedButtons, Text, TextInput, useTheme } from 'react-native-paper';
 
 import { kategoriaModositas, tranzakcioModositas, tranzakcioTorles } from '../../services/api';
+import { SzemelyValaszto } from '../../components/SzemelyValaszto';
 import { useStore } from '../../store/useStore';
 import type { FizetesiMod, Tulajdonos } from '../../types';
 import { formatFt } from '../../utils/format';
@@ -179,15 +180,7 @@ export default function TranzakcioSzerkeszto() {
       <Text variant="titleSmall" style={styles.cim}>
         Tulajdonos
       </Text>
-      <SegmentedButtons
-        value={tulajdonos}
-        onValueChange={(v) => setTulajdonos(v as Tulajdonos)}
-        buttons={[
-          { value: 'kozos', label: 'Közös' },
-          { value: 'ferj', label: 'Férj' },
-          { value: 'feleseg', label: 'Feleség' },
-        ]}
-      />
+      <SzemelyValaszto ertek={tulajdonos} onChange={setTulajdonos} />
 
       <Button
         mode="contained"

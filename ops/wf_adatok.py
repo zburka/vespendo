@@ -14,7 +14,8 @@ return [{ json: {
   keretek: sorok('Keretek').map(r => ({ id: String(r.id), kategoria_id: link(r.kategoria_id), havi_keret: szam(r.havi_keret), aktiv: !!r.aktiv })),
   elofizetesek: sorok('Előfizetések').map(r => ({ id: String(r.id), megnevezes: r.megnevezes, varhato_osszeg: szam(r.varhato_osszeg), esedekesseg_napja: szam(r.esedekesseg_napja), kategoria_id: link(r.kategoria_id) })),
   celok: sorok('Célok').map(r => ({ id: String(r.id), cel_neve: r.cel_neve, celosszeg: szam(r.celosszeg), aktualis_osszeg: szam(r.aktualis_osszeg) })),
-  szabalyok: sorok('Szabályok').map(r => ({ id: String(r.id), minta: r.minta, kategoria_id: link(r.kategoria_id), alapertelmezett_tulajdonos: r.alapertelmezett_tulajdonos?.value })),
+  szabalyok: sorok('Szabályok').map(r => ({ id: String(r.id), minta: r.minta, kategoria_id: link(r.kategoria_id), alapertelmezett_tulajdonos: r.alapertelmezett_tulajdonos || undefined })),
+  szemelyek: sorok('Személyek').map(r => ({ kulcs: r.kulcs, nev: r.nev, aktiv: !!r.aktiv })),
 } }];
 """
 nodes = [
@@ -24,11 +25,12 @@ nodes = [
     lista('Előfizetések', 'elofizetesek', (720, 0)),
     lista('Célok', 'megtakaritasi_celok', (960, 0)),
     lista('Szabályok', 'szabalymotor', (1200, 0)),
-    code('Összeállítás', ADATOK, (1440, 0)),
-    respond('Válasz', '={{ $json }}', (1680, 0)),
+    lista('Személyek', 'szemelyek', (1440, 0)),
+    code('Összeállítás', ADATOK, (1680, 0)),
+    respond('Válasz', '={{ $json }}', (1920, 0)),
 ]
 k = {}
-lanc = ['Webhook', 'Kategóriák', 'Keretek', 'Előfizetések', 'Célok', 'Szabályok', 'Összeállítás', 'Válasz']
+lanc = ['Webhook', 'Kategóriák', 'Keretek', 'Előfizetések', 'Célok', 'Szabályok', 'Személyek', 'Összeállítás', 'Válasz']
 for a, b in zip(lanc, lanc[1:]): osszekot(k, a, b)
 telepit('VeSpendo – Alapadatok', nodes, k)
 
@@ -38,7 +40,7 @@ const link = (v) => (v && v[0]) ? String(v[0].id) : '';
 const sorok = $input.all().flatMap(i => i.json.results || []);
 return [{ json: { tranzakciok: sorok.map(r => ({
   id: String(r.id), datum: r.datum, osszeg: Number(r.osszeg), kereskedo: r.kereskedo, kategoria_id: link(r.kategoria_id),
-  tipus: r.tipus?.value, tulajdonos: r.tulajdonos?.value, fizetesi_mod: r.fizetesi_mod?.value, forras: r.forras?.value,
+  tipus: r.tipus?.value, tulajdonos: r.tulajdonos || 'kozos', fizetesi_mod: r.fizetesi_mod?.value, forras: r.forras?.value,
   allapot: r.allapot?.value, megjegyzes: r.megjegyzes || undefined, nyugta_kep_url: r.nyugta_kep_url || undefined,
 })) } }];
 """

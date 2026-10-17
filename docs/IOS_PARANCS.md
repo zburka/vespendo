@@ -12,7 +12,7 @@ az egy hívásban elemzi és importálja (duplikációk automatikusan kimaradnak
 
    **a) URL tartalmának lekérése**
    - URL: `https://n8n.cloudoptima.hu/webhook/banki-fajl-gyors-import?feltolto=ferj`
-     (a `feltolto` értéke `ferj` vagy `feleseg`: ki töltötte fel)
+     (a `feltolto` a személy kulcsa, ahogy a VeSpendo Beállítások → Személyek listában látod, pl. `ferj` vagy `feleseg`; új személy esetén az ő kulcsa)
    - Metódus: **POST**
    - Fejlécek: `X-App-Key` = az alkalmazás kulcsa (a szerveren: `grep VESPENDO_APP_KEY /root/.vespendo.env`)
    - Kérés törzse: **Fájl**, és a fájl legyen a **Parancs bemenete** (Shortcut Input).

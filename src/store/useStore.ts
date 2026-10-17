@@ -6,6 +6,7 @@ import {
   KATEGORIAK,
   KOLTSEGKERETEK,
   SZABALYOK,
+  SZEMELYEK,
   TRANZAKCIOK,
 } from '../mock/data';
 import {
@@ -17,9 +18,10 @@ import {
   elofizetesTorles,
   HibasKulcs,
   keretMentes,
+  szemelyMentes,
   tranzakciokLekeres,
 } from '../services/api';
-import { szerepMent, type Szerep } from '../services/kulcs';
+import { szerepMent } from '../services/kulcs';
 import { alkalmazImport } from '../services/mockImport';
 import type {
   BankiImportKeres,
@@ -29,15 +31,16 @@ import type {
   Koltsegkeret,
   MegtakaritasiCel,
   Szabaly,
+  Szemely,
   Tranzakcio,
-  Tulajdonos,
 } from '../types';
 import { aktualisHonap, leptetHonap } from '../utils/format';
 import { kereskedoKulcs } from '../utils/kereskedo';
 
 let elsoBetoltes = true;
 
-export type TulajdonosSzuro = 'mind' | Tulajdonos;
+/** Tulajdonos szerinti szűrő: 'mind' vagy egy személy kulcsa. */
+export type TulajdonosSzuro = string;
 
 interface State {
   honap: string; // YYYY-MM
@@ -48,6 +51,12 @@ interface State {
   elofizetesek: Elofizetes[];
   celok: MegtakaritasiCel[];
   szabalyok: Szabaly[];
+  szemelyek: Szemely[];
+  /** Dashboardról kategóriára szűrés a tranzakciólistán (kategória azonosító). */
+  kategoriaSzuro: string | null;
+  setKategoriaSzuro: (id: string | null) => void;
+  /** Új személy (kulcs nélkül) vagy átnevezés / kikapcsolás. */
+  mentSzemely: (kulcs: string | undefined, nev: string, aktiv: boolean) => Promise<void>;
   /** Élő módban: töltés állapota és az utolsó hiba. */
   toltes: boolean;
   hiba: string | null;
@@ -62,9 +71,9 @@ interface State {
   mentCel: (cel: Omit<MegtakaritasiCel, 'id'> & { id?: string }) => Promise<void>;
   torolCel: (id: string) => Promise<void>;
   /** Ki használja ezt a telefont; az importoknál ez az alapértelmezett feltöltő. */
-  szerep: Szerep | null;
+  szerep: string | null;
   szerepSzukseges: boolean;
-  setSzerep: (szerep: Szerep) => Promise<void>;
+  setSzerep: (szerep: string) => Promise<void>;
   setSzerepSzukseges: (ertek: boolean) => void;
   mentElofizetes: (e: Omit<Elofizetes, 'id'> & { id?: string }) => Promise<void>;
   torolElofizetes: (id: string) => Promise<void>;
@@ -91,6 +100,21 @@ export const useStore = create<State>((set, get) => ({
   elofizetesek: ELO_API ? [] : ELOFIZETESEK,
   celok: ELO_API ? [] : CELOK,
   szabalyok: ELO_API ? [] : SZABALYOK,
+  szemelyek: ELO_API ? [] : SZEMELYEK,
+  kategoriaSzuro: null,
+  setKategoriaSzuro: (kategoriaSzuro) => set({ kategoriaSzuro }),
+  mentSzemely: async (kulcs, nev, aktiv) => {
+    if (ELO_API) {
+      await szemelyMentes({ kulcs, nev, aktiv });
+      await get().betoltes();
+      return;
+    }
+    set((s) => ({
+      szemelyek: kulcs
+        ? s.szemelyek.map((x) => (x.kulcs === kulcs ? { ...x, nev, aktiv } : x))
+        : [...s.szemelyek, { kulcs: `szemely${Date.now()}`, nev, aktiv }],
+    }));
+  },
   toltes: false,
   hiba: null,
   kulcsSzukseges: false,

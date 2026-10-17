@@ -4,6 +4,7 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Chip, SegmentedButtons, Text, TextInput } from 'react-native-paper';
 
 import { ELO_API, ujTranzakcio } from '../services/api';
+import { SzemelyValaszto } from '../components/SzemelyValaszto';
 import { useStore } from '../store/useStore';
 import type { FizetesiMod, TranzakcioTipus, Tulajdonos } from '../types';
 
@@ -27,7 +28,7 @@ export default function UjTetelScreen() {
   const [osszeg, setOsszeg] = useState('');
   const [datum, setDatum] = useState(maiNap());
   const [kategoriaId, setKategoriaId] = useState('');
-  const [tulajdonos, setTulajdonos] = useState<Tulajdonos>('kozos');
+  const [tulajdonos, setTulajdonos] = useState<Tulajdonos>(useStore.getState().szerep ?? 'kozos');
   const [mod, setMod] = useState<FizetesiMod>(
     params.mod === 'kartya' || params.mod === 'atutalas' ? params.mod : 'keszpenz',
   );
@@ -130,15 +131,7 @@ export default function UjTetelScreen() {
       </View>
 
       <Text variant="titleSmall">Tulajdonos</Text>
-      <SegmentedButtons
-        value={tulajdonos}
-        onValueChange={(v) => setTulajdonos(v as Tulajdonos)}
-        buttons={[
-          { value: 'kozos', label: 'Közös' },
-          { value: 'ferj', label: 'Férj' },
-          { value: 'feleseg', label: 'Feleség' },
-        ]}
-      />
+      <SzemelyValaszto ertek={tulajdonos} onChange={setTulajdonos} />
 
       <Text variant="titleSmall">Fizetési mód</Text>
       <SegmentedButtons

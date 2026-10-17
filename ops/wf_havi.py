@@ -7,7 +7,7 @@ SZAMOL = r"""
 const honap = (/^\d{4}-\d{2}$/.test($('Webhook').first().json.query.honap || '')) ? $('Webhook').first().json.query.honap : new Date().toISOString().slice(0, 7);
 const sorok = (nev) => $(nev).all().flatMap(i => i.json.results || []);
 const katId = (v) => (v && v[0]) ? v[0].id : null;
-const tr = sorok('Tranzakciók').map(r => ({ osszeg: Number(r.osszeg), kereskedo: String(r.kereskedo || ''), kat: katId(r.kategoria_id), tipus: r.tipus?.value, tul: r.tulajdonos?.value }));
+const tr = sorok('Tranzakciók').map(r => ({ osszeg: Number(r.osszeg), kereskedo: String(r.kereskedo || ''), kat: katId(r.kategoria_id), tipus: r.tipus?.value, tul: r.tulajdonos || 'kozos' }));
 const kategoriak = Object.fromEntries(sorok('Kategóriák').map(r => [r.id, r.nev]));
 const kiadasok = tr.filter(t => t.tipus === 'kiadas');
 const katNevek = {};
@@ -37,6 +37,7 @@ const friss = !!tarolt && tarolt.l === lenyomat;
 return [{ json: {
   kell_ai: tr.length > 0 && !friss, lenyomat, ai_adat: adat, honap,
   osszes_bevetel, osszes_kiadas, egyenleg: osszes_bevetel - osszes_kiadas,
+  bontas_szemely_szerint: kiadasok.reduce((m, t) => { m[t.tul] = (m[t.tul] || 0) + t.osszeg; return m; }, {}),
   bontas_tulajdonos_szerint: { kozos: sum(kiadasok.filter(t => t.tul === 'kozos')), ferj_sajat: sum(kiadasok.filter(t => t.tul === 'ferj')), feleseg_sajat: sum(kiadasok.filter(t => t.tul === 'feleseg')) },
   keretek, elofizetesek,
   varhato_hatralevo_elofizetesek: elofizetesek.filter(e => !e.kifizetve).reduce((s, e) => s + e.varhato_osszeg, 0),

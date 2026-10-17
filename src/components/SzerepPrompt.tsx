@@ -2,25 +2,31 @@ import { Button, Dialog, Portal, Text } from 'react-native-paper';
 
 import { useStore } from '../store/useStore';
 
-/** Első indításkor megkérdezi, ki használja ezt a telefont (az importok alapértelmezett feltöltője). */
+/** Első indításkor megkérdezi, ki használja ezt a telefont (az importok és új tételek alapértelmezett tulajdonosa). */
 export function SzerepPrompt() {
   const szukseges = useStore((s) => s.szerepSzukseges);
   const kulcsSzukseges = useStore((s) => s.kulcsSzukseges);
+  const szemelyek = useStore((s) => s.szemelyek);
   const setSzerep = useStore((s) => s.setSzerep);
+
+  const valaszthato = szemelyek.filter((p) => p.aktiv && p.kulcs !== 'kozos');
 
   return (
     <Portal>
-      <Dialog visible={szukseges && !kulcsSzukseges} dismissable={false}>
+      <Dialog visible={szukseges && !kulcsSzukseges && valaszthato.length > 0} dismissable={false}>
         <Dialog.Title>Ki vagy te?</Dialog.Title>
         <Dialog.Content>
           <Text variant="bodyMedium">
-            Ezt a beállítást a banki importnál és a nyugtáknál használjuk alapértelmezett
-            feltöltőként. Később a Beállítások fülön módosíthatod.
+            Ezt a banki importnál, a nyugtáknál és az új tételeknél használjuk alapértelmezett
+            tulajdonosként. Később a Beállítások fülön módosíthatod.
           </Text>
         </Dialog.Content>
         <Dialog.Actions>
-          <Button onPress={() => setSzerep('ferj')}>Férj</Button>
-          <Button onPress={() => setSzerep('feleseg')}>Feleség</Button>
+          {valaszthato.map((p) => (
+            <Button key={p.kulcs} onPress={() => setSzerep(p.kulcs)}>
+              {p.nev}
+            </Button>
+          ))}
         </Dialog.Actions>
       </Dialog>
     </Portal>

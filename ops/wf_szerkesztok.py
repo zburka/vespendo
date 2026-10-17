@@ -84,3 +84,48 @@ k = {}
 osszekot(k, 'Webhook', 'Előkészítés'); osszekot(k, 'Előkészítés', 'Módosítás'); osszekot(k, 'Módosítás', 'Válasz')
 for n in ('Előkészítés', 'Módosítás'): osszekot(k, n, 'Hiba válasz', 1)
 telepit('VeSpendo – Tranzakció módosítás', nodes, k)
+
+# ---------- POST /webhook/szemely-mentes {kulcs?, nev, aktiv?}: új személy (kulcs nélkül) vagy átnevezés/aktiválás
+SZ_ELO = r"""
+const b = $('Webhook').first().json.body || {};
+const nev = String(b.nev || '').trim();
+if (!nev) throw new Error('A név kötelező');
+const kulcs = b.kulcs === undefined || b.kulcs === null ? '' : String(b.kulcs);
+if (kulcs && !/^[a-z0-9_]{1,30}$/.test(kulcs)) throw new Error('Érvénytelen kulcs');
+if (kulcs === 'kozos' && b.aktiv === false) throw new Error('A „Közös” nem kapcsolható ki');
+return [{ json: { nev: nev.slice(0, 50), kulcs, aktiv: b.aktiv !== false } }];
+"""
+SZ_DONT = r"""
+const e = $('Előkészítés').first().json;
+const sorok = $input.all().flatMap(i => i.json.results || []);
+if (e.kulcs) {
+  const sor = sorok.find(r => r.kulcs === e.kulcs);
+  if (!sor) throw new Error('Nincs ilyen személy');
+  return [{ json: { ...e, sor_id: String(sor.id) } }];
+}
+// új személy: a névből ékezet nélküli, egyedi kulcs
+const alap = e.nev.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 24) || 'szemely';
+const foglalt = new Set(sorok.map(r => r.kulcs));
+let kulcs = alap, n = 2;
+while (foglalt.has(kulcs)) kulcs = `${alap}_${n++}`;
+return [{ json: { ...e, kulcs, sor_id: '' } }];
+"""
+nodes = [
+    webhook('Webhook', 'szemely-mentes', 'POST', (0, 0)),
+    code('Előkészítés', SZ_ELO, (240, 0), hiba_ag=True),
+    http('Személyek', 'GET', f"={BR}{T['szemelyek']}/?user_field_names=true&size=200", (480, 0), creds=cred_baserow(), hiba_ag=True, lapozas=True),
+    code('Döntés', SZ_DONT, (720, 0), hiba_ag=True),
+    if_('Van már?', '={{ $json.sor_id }}', '', VAN, (960, 0)),
+    http('Frissítés', 'PATCH', f"={BR}{T['szemelyek']}/" + "{{ $json.sor_id }}/?user_field_names=true", (1200, -120),
+         body='={{ JSON.stringify({ nev: $json.nev, aktiv: $json.aktiv }) }}', creds=cred_baserow(), hiba_ag=True),
+    http('Létrehozás', 'POST', f"{BR}{T['szemelyek']}/?user_field_names=true", (1200, 120),
+         body='={{ JSON.stringify({ kulcs: $json.kulcs, nev: $json.nev, aktiv: $json.aktiv }) }}', creds=cred_baserow(), hiba_ag=True),
+    respond('Válasz', "={{ { status: 'success', kulcs: $('Döntés').first().json.kulcs } }}", (1440, 0)),
+    hiba_valasz((480, 240)),
+]
+k = {}
+for a, b in [('Webhook', 'Előkészítés'), ('Előkészítés', 'Személyek'), ('Személyek', 'Döntés'), ('Döntés', 'Van már?')]: osszekot(k, a, b)
+osszekot(k, 'Van már?', 'Frissítés', 0); osszekot(k, 'Van már?', 'Létrehozás', 1)
+osszekot(k, 'Frissítés', 'Válasz'); osszekot(k, 'Létrehozás', 'Válasz')
+for n in ('Előkészítés', 'Személyek', 'Döntés', 'Frissítés', 'Létrehozás'): osszekot(k, n, 'Hiba válasz', 1)
+telepit('VeSpendo – Személy mentés', nodes, k)

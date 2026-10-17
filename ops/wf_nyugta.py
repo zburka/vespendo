@@ -18,7 +18,8 @@ ELOKESZIT = r"""
 const b = $('Webhook').first().json.body || {};
 const m = /^data:(image\/(?:jpeg|png|webp|gif));base64,(.+)$/s.exec(String(b.kep_base64 || ''));
 if (!m) throw new Error('Hiányzó vagy érvénytelen kep_base64');
-const feltolto = b.feltolto === 'feleseg' ? 'feleseg' : 'ferj';
+const feltolto = String(b.feltolto || 'ferj');
+if (!/^[a-z0-9_]{1,30}$/.test(feltolto)) throw new Error('Érvénytelen feltolto (a személy kulcsa kell)');
 const megj = String(b.megjegyzes || '').slice(0, 500);
 const prompt = 'Magyar pénztári nyugta. Add vissza KIZÁRÓLAG egy JSON objektumként: ' +
   '{"kereskedo": szöveg, "osszeg": a fizetendő végösszeg Ft-ban (szám), "datum": "YYYY-MM-DD" vagy null, "fizetesi_mod": "kartya"|"keszpenz"|"atutalas", ' +

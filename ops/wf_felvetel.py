@@ -12,7 +12,7 @@ if (!/^\d+$/.test(kat)) throw new Error('Érvénytelen kategória');
 const kereskedo = String(b.kereskedo || '').trim();
 if (!kereskedo) throw new Error('A megnevezés kötelező');
 const tipus = ['kiadas', 'bevetel_egyszeri', 'bevetel_rendszeres'].includes(b.tipus) ? b.tipus : 'kiadas';
-const tulajdonos = ['kozos', 'ferj', 'feleseg'].includes(b.tulajdonos) ? b.tulajdonos : 'kozos';
+const tulajdonos = /^[a-z0-9_]{1,30}$/.test(String(b.tulajdonos || '')) ? b.tulajdonos : 'kozos';
 const mod = ['kartya', 'keszpenz', 'atutalas'].includes(b.fizetesi_mod) ? b.fizetesi_mod : 'keszpenz';
 return [{ json: { sor: { kereskedo: kereskedo.slice(0, 200), datum: b.datum, osszeg, kategoria_id: [Number(kat)], tipus, tulajdonos,
   fizetesi_mod: mod, forras: 'kezi', allapot: 'lezart', megjegyzes: String(b.megjegyzes || '').slice(0, 1000) } } }];

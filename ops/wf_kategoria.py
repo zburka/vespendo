@@ -10,7 +10,7 @@ if (b.uj_kategoria_id !== undefined && b.uj_kategoria_id !== null) {
   if (!/^\d+$/.test(String(b.uj_kategoria_id))) throw new Error('Érvénytelen uj_kategoria_id');
   javitas.kategoria_id = [Number(b.uj_kategoria_id)];
 }
-if (['kozos', 'ferj', 'feleseg'].includes(b.uj_tulajdonos)) javitas.tulajdonos = b.uj_tulajdonos;
+if (b.uj_tulajdonos !== undefined) { if (!/^[a-z0-9_]{1,30}$/.test(String(b.uj_tulajdonos))) throw new Error('Érvénytelen uj_tulajdonos'); javitas.tulajdonos = b.uj_tulajdonos; }
 if (!Object.keys(javitas).length) throw new Error('Nincs módosítandó mező');
 return [{ json: { id, javitas, minta: String(b.kereskedo_minta || '').toLowerCase().trim(), kategoria: javitas.kategoria_id?.[0] ?? null } }];
 """
@@ -31,7 +31,7 @@ nodes = [
     http('Szabály frissítése', 'PATCH', f"={BR}{T['szabalymotor']}/" + "{{ $json.szabaly_id }}/?user_field_names=true", (1680, -240),
          body='={{ JSON.stringify({ kategoria_id: [$json.kategoria] }) }}', creds=cred_baserow()),
     http('Szabály létrehozása', 'POST', f"{BR}{T['szabalymotor']}/?user_field_names=true", (1680, 0),
-         body="={{ JSON.stringify({ minta: $json.minta, kategoria_id: [$json.kategoria], alapertelmezett_tulajdonos: 'kozos' }) }}", creds=cred_baserow()),
+         body="={{ JSON.stringify({ minta: $json.minta, kategoria_id: [$json.kategoria], }) }}", creds=cred_baserow()),
     respond('Válasz', "={{ { status: 'success' } }}", (1920, 0)),
     hiba_valasz((480, 240)),
 ]

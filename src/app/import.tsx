@@ -2,17 +2,11 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { File } from 'expo-file-system';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import {
-  ActivityIndicator,
-  Button,
-  Card,
-  Divider,
-  SegmentedButtons,
-  Text,
-} from 'react-native-paper';
+import { ActivityIndicator, Button, Card, Divider, Text } from 'react-native-paper';
 
 import { bankiImport, ELO_API, elemezBankiFajl } from '../services/api';
 import { dekodol, parseBankiCsv } from '../services/csvParser';
+import { SzemelyValaszto } from '../components/SzemelyValaszto';
 import { useStore } from '../store/useStore';
 import type { FajlElemzesValasz, ImportOsszegzes } from '../types';
 import { formatFt, formatNap } from '../utils/format';
@@ -27,9 +21,7 @@ export default function ImportScreen() {
 
   const [fazis, setFazis] = useState<Fazis>('beolvasas');
   const [csv, setCsv] = useState<NonNullable<FajlElemzesValasz['data']> | null>(null);
-  const [feltolto, setFeltolto] = useState<'ferj' | 'feleseg'>(
-    useStore.getState().szerep ?? 'ferj',
-  );
+  const [feltolto, setFeltolto] = useState<string>(useStore.getState().szerep ?? 'ferj');
   const [osszegzes, setOsszegzes] = useState<ImportOsszegzes | null>(null);
   const [hiba, setHiba] = useState('');
 
@@ -165,14 +157,7 @@ export default function ImportScreen() {
           </Card>
 
           <Text variant="titleSmall">Ki töltötte fel?</Text>
-          <SegmentedButtons
-            value={feltolto}
-            onValueChange={(v) => setFeltolto(v as 'ferj' | 'feleseg')}
-            buttons={[
-              { value: 'ferj', label: 'Férj' },
-              { value: 'feleseg', label: 'Feleség' },
-            ]}
-          />
+          <SzemelyValaszto ertek={feltolto} onChange={setFeltolto} kozos={false} />
           <Button mode="contained" icon="upload" onPress={kuldes}>
             Import indítása
           </Button>

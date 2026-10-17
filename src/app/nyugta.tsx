@@ -1,17 +1,11 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Image, ScrollView, StyleSheet, View } from 'react-native';
-import {
-  ActivityIndicator,
-  Button,
-  Card,
-  SegmentedButtons,
-  Text,
-  TextInput,
-} from 'react-native-paper';
+import { ActivityIndicator, Button, Card, Text, TextInput } from 'react-native-paper';
 
 import { ELO_API, feltoltNyugta } from '../services/api';
 import { tomorit } from '../services/kepTomorites';
+import { SzemelyValaszto } from '../components/SzemelyValaszto';
 import { useStore } from '../store/useStore';
 import type { NyugtaValasz } from '../types';
 import { formatFt } from '../utils/format';
@@ -31,9 +25,7 @@ export default function NyugtaScreen() {
   const betoltes = useStore((s) => s.betoltes);
 
   const [megjegyzes, setMegjegyzes] = useState('');
-  const [feltolto, setFeltolto] = useState<'ferj' | 'feleseg'>(
-    useStore.getState().szerep ?? 'ferj',
-  );
+  const [feltolto, setFeltolto] = useState<string>(useStore.getState().szerep ?? 'ferj');
   const [fazis, setFazis] = useState<Fazis>('szerkesztes');
   const [valasz, setValasz] = useState<NyugtaValasz['data'] | null>(null);
   const [hiba, setHiba] = useState('');
@@ -96,14 +88,7 @@ export default function NyugtaScreen() {
             multiline
           />
           <Text variant="titleSmall">Ki fizetett?</Text>
-          <SegmentedButtons
-            value={feltolto}
-            onValueChange={(v) => setFeltolto(v as 'ferj' | 'feleseg')}
-            buttons={[
-              { value: 'ferj', label: 'Férj' },
-              { value: 'feleseg', label: 'Feleség' },
-            ]}
-          />
+          <SzemelyValaszto ertek={feltolto} onChange={setFeltolto} kozos={false} />
           {fazis === 'hiba' && <Text style={styles.hiba}>Hiba: {hiba}</Text>}
           <Button mode="contained" icon="send" onPress={kuldes}>
             {fazis === 'hiba' ? 'Újrapróbálás' : 'Küldés'}

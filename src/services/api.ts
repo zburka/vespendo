@@ -199,3 +199,14 @@ export async function tranzakcioTorles(id: string): Promise<void> {
   if (!ELO_API) return;
   await keres<unknown>('tranzakcio-torles', { method: 'POST', body: { id } });
 }
+
+/** `POST /webhook/szemely-mentes`: új személy (kulcs nélkül) vagy átnevezés / kikapcsolás. Visszaadja a kulcsot. */
+export async function szemelyMentes(body: {
+  kulcs?: string;
+  nev: string;
+  aktiv?: boolean;
+}): Promise<string | null> {
+  if (!ELO_API) return null;
+  const valasz = await keres<{ kulcs?: string }>('szemely-mentes', { method: 'POST', body });
+  return valasz.kulcs ?? null;
+}

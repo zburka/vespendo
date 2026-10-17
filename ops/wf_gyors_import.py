@@ -17,7 +17,8 @@ if (!base64 && w.binary && w.binary.data) {
   nev = nev || w.binary.data.fileName || q.nev || 'kivonat.pdf';
 }
 if (!base64) throw new Error('Hiányzik a fájl: küldd a fájlt a kérés törzsében, vagy JSON-ban fajl_base64 mezőként');
-const feltolto = (b.feltolto || q.feltolto) === 'feleseg' ? 'feleseg' : 'ferj';
+const feltolto = String(b.feltolto || q.feltolto || 'ferj');
+if (!/^[a-z0-9_]{1,30}$/.test(feltolto)) throw new Error('Érvénytelen feltolto (a személy kulcsa kell)');
 return [{ json: { fajl_nev: String(nev || 'kivonat.pdf'), fajl_base64: String(base64), feltolto } }];
 """
 ATADAS = r"""

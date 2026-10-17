@@ -1,6 +1,13 @@
 export type KategoriaTipus = 'kiadas' | 'bevetel';
 export type TranzakcioTipus = 'kiadas' | 'bevetel_rendszeres' | 'bevetel_egyszeri';
-export type Tulajdonos = 'kozos' | 'ferj' | 'feleseg';
+/** A személy kulcsa (a szemelyek tábla kulcsa): 'kozos', 'ferj', 'feleseg' vagy bármely felvett személy. */
+export type Tulajdonos = string;
+
+export interface Szemely {
+  kulcs: string;
+  nev: string;
+  aktiv: boolean;
+}
 export type FizetesiMod = 'kartya' | 'keszpenz' | 'atutalas';
 export type Forras = 'bank_import' | 'nyugta_foto' | 'kezi';
 export type Allapot = 'lezart' | 'banki_egyeztetesre_var';
@@ -65,6 +72,8 @@ export interface HaviOsszesito {
   osszes_kiadas: number;
   egyenleg: number;
   bontas_tulajdonos_szerint: { kozos: number; ferj_sajat: number; feleseg_sajat: number };
+  /** Kiadás személyenként (kulcs → összeg); a `bontas_tulajdonos_szerint` helyett ezt használja az app. */
+  bontas_szemely_szerint?: Record<string, number>;
   keretek: KeretAllapot[];
   /** Az élő végpont csak az összeget adja; a részletes lista a mock/lokális számításból jön. */
   elofizetesek?: ElofizetesAllapot[];
@@ -133,6 +142,7 @@ export interface Alapadatok {
   elofizetesek: Elofizetes[];
   celok: MegtakaritasiCel[];
   szabalyok: Szabaly[];
+  szemelyek: Szemely[];
 }
 
 export interface FajlElemzesKeres {

@@ -9,11 +9,11 @@ export const kulcsTorol = () => SecureStore.deleteItemAsync(KULCS);
 
 const SZEREP = 'vespendo.szerep';
 
-export type Szerep = 'ferj' | 'feleseg';
+export type Szerep = string;
 
 /** Ki használja ezt a telefont (az importoknál alapértelmezett feltöltő). */
 export async function szerepOlvas(): Promise<Szerep | null> {
   const ertek = await SecureStore.getItemAsync(SZEREP);
-  return ertek === 'ferj' || ertek === 'feleseg' ? ertek : null;
+  return ertek && /^[a-z0-9_]{1,30}$/.test(ertek) ? ertek : null;
 }
 export const szerepMent = (szerep: Szerep) => SecureStore.setItemAsync(SZEREP, szerep);
