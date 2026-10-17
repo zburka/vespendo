@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Alert } from '../../utils/uzenet';
 import { Button, Chip, SegmentedButtons, Text, TextInput, useTheme } from 'react-native-paper';
 
 import { kategoriaModositas, tranzakcioModositas, tranzakcioTorles } from '../../services/api';

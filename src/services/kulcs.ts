@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './tarolo';
 
 const KULCS = 'vespendo.app_key';
 

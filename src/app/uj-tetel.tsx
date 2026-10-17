@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Alert } from '../utils/uzenet';
 import { Button, Chip, SegmentedButtons, Text, TextInput } from 'react-native-paper';
 
 import { ELO_API, ujTranzakcio } from '../services/api';

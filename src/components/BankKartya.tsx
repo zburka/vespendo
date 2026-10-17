@@ -1,6 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
+import { Alert } from '../utils/uzenet';
 import { Button, Card, Divider, Text, useTheme } from 'react-native-paper';
 
 import {
@@ -49,6 +50,10 @@ export function BankKartya() {
     try {
       const url = await bankOsszekotes(szemely);
       // A bejelentkezés az OTP-appban hagyható jóvá; a böngészőből visszatérve az állapot frissül.
+      if (Platform.OS === 'web') {
+        window.location.assign(url);
+        return;
+      }
       await WebBrowser.openBrowserAsync(url);
       await frissit();
     } catch (e) {

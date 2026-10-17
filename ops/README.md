@@ -48,3 +48,14 @@ A tételek `tulajdonos` mezője a személy **kulcsát** tárolja (szöveg), a `s
 A „Közös” is egy személy (`kozos`). Átnevezés: a `szemelyek` tábla `nev` mezője (vagy az appban a Beállítások fülön), a
 tételek nem változnak. Új személy a `szemely-mentes` végponttal (az app Beállítások → Új személy) vagy a Baserow-ban vehető fel.
 Az import a tulajdonost mindig a feltöltőre állítja (a szabályok alapértelmezett tulajdonosa üres, hacsak nem adtad meg).
+
+## Webes (PWA) változat
+A telefonon a Safariból "Főképernyőre" adható webalkalmazás. A statikus csomagot egy nginx konténer szolgálja ki, a `/webhook/`
+hívásokat az n8n-hez továbbítja (ugyanarról az eredetről, nincs CORS). Telepítés / frissítés: `ops/web_deploy.sh`
+(build és a kiszolgált mappa cseréje, a konténert nem kell újraindítani; a felhasználók a következő megnyitáskor az új verziót kapják).
+```bash
+docker run -d --name vespendo-web --network cloudoptima-net --restart unless-stopped \
+  -v /root/vespendo-web:/srv:ro -v /root/vespendo-web/nginx.conf:/etc/nginx/conf.d/default.conf:ro nginx:alpine
+```
+Az `ops/web/nginx.conf` a konfiguráció. Az nginx-proxy-managerben a (al)domainhez proxy host kell: `vespendo-web:80`, Let's Encrypt,
+Force SSL, és a Haladó beállítások között `client_max_body_size 25m;`.

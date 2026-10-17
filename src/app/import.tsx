@@ -1,9 +1,9 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { File } from 'expo-file-system';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Button, Card, Divider, Text } from 'react-native-paper';
 
+import { fajlBajtok, fajlBase64 } from '../services/fajl';
 import { bankiImport, ELO_API, elemezBankiFajl } from '../services/api';
 import { dekodol, parseBankiCsv } from '../services/csvParser';
 import { SzemelyValaszto } from '../components/SzemelyValaszto';
@@ -31,7 +31,7 @@ export default function ImportScreen() {
         let eredmeny: NonNullable<FajlElemzesValasz['data']>;
         if (ELO_API) {
           // PDF / XLSX / CSV: a szerveroldali elemző kezeli, formátumtól függetlenül
-          const fajl_base64 = await new File(uri).base64();
+          const fajl_base64 = await fajlBase64(uri);
           eredmeny = await elemezBankiFajl({ fajl_nev: nev ?? 'kivonat', fajl_base64 });
         } else {
           if (!/\.csv$/i.test(nev ?? '')) {
@@ -39,7 +39,7 @@ export default function ImportScreen() {
               'Az app mock módban fut (EXPO_PUBLIC_MOCK=1), ezért csak CSV olvasható. Töröld ezt a beállítást, és indítsd újra az appot.',
             );
           }
-          const csv = parseBankiCsv(dekodol(await new File(uri).bytes()));
+          const csv = parseBankiCsv(dekodol(await fajlBajtok(uri)));
           eredmeny = { ...csv, megbizhatosag: 'magas', figyelmeztetesek: [] };
         }
         if (eredmeny.tranzakciok.length === 0)
