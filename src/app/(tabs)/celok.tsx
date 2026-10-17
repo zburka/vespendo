@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Keyboard, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Button,
   Card,
@@ -16,6 +16,7 @@ import {
 } from 'react-native-paper';
 
 import { AdatAllapot } from '../../components/AdatAllapot';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { useStore } from '../../store/useStore';
 import type { Elofizetes, Kategoria, MegtakaritasiCel } from '../../types';
 import { formatFt } from '../../utils/format';
@@ -49,6 +50,7 @@ export default function CelokScreen() {
   const [nap, setNap] = useState('');
   const [efKategoria, setEfKategoria] = useState('');
   const [mentes, setMentes] = useState(false);
+  const billentyuzet = useKeyboardHeight();
 
   const kiadasKategoriak = kategoriak.filter((k) => k.tipus === 'kiadas');
 
@@ -230,7 +232,12 @@ export default function CelokScreen() {
       </Card>
 
       <Portal>
-        <Dialog visible={szerkesztes !== null} onDismiss={bezar}>
+        <Dialog
+          visible={szerkesztes !== null}
+          dismissable={false}
+          onDismiss={bezar}
+          style={{ marginBottom: billentyuzet }}
+        >
           <Dialog.Title>
             {szerkesztes?.tipus === 'keret'
               ? `Keret: ${szerkesztes.kategoria.nev}`
@@ -242,64 +249,66 @@ export default function CelokScreen() {
                   ? 'Cél szerkesztése'
                   : 'Új cél'}
           </Dialog.Title>
-          <Dialog.Content style={styles.dialogus}>
-            {szerkesztes?.tipus === 'cel' && (
-              <TextInput mode="outlined" label="Cél neve" value={nev} onChangeText={setNev} />
-            )}
-            {szerkesztes?.tipus === 'elofizetes' && (
-              <TextInput mode="outlined" label="Megnevezés" value={nev} onChangeText={setNev} />
-            )}
-            <TextInput
-              mode="outlined"
-              label={
-                szerkesztes?.tipus === 'keret'
-                  ? 'Havi keret (Ft)'
-                  : szerkesztes?.tipus === 'elofizetes'
-                    ? 'Havi összeg (Ft)'
-                    : 'Célösszeg (Ft)'
-              }
-              keyboardType="numeric"
-              value={osszeg}
-              onChangeText={setOsszeg}
-            />
-            {szerkesztes?.tipus === 'cel' && (
+          <Dialog.Content>
+            <Pressable onPress={Keyboard.dismiss} style={styles.dialogus}>
+              {szerkesztes?.tipus === 'cel' && (
+                <TextInput mode="outlined" label="Cél neve" value={nev} onChangeText={setNev} />
+              )}
+              {szerkesztes?.tipus === 'elofizetes' && (
+                <TextInput mode="outlined" label="Megnevezés" value={nev} onChangeText={setNev} />
+              )}
               <TextInput
                 mode="outlined"
-                label="Eddig megtakarítva (Ft)"
+                label={
+                  szerkesztes?.tipus === 'keret'
+                    ? 'Havi keret (Ft)'
+                    : szerkesztes?.tipus === 'elofizetes'
+                      ? 'Havi összeg (Ft)'
+                      : 'Célösszeg (Ft)'
+                }
                 keyboardType="numeric"
-                value={aktualis}
-                onChangeText={setAktualis}
+                value={osszeg}
+                onChangeText={setOsszeg}
               />
-            )}
-            {szerkesztes?.tipus === 'elofizetes' && (
-              <>
+              {szerkesztes?.tipus === 'cel' && (
                 <TextInput
                   mode="outlined"
-                  label="Esedékesség napja (1–31)"
+                  label="Eddig megtakarítva (Ft)"
                   keyboardType="numeric"
-                  value={nap}
-                  onChangeText={setNap}
+                  value={aktualis}
+                  onChangeText={setAktualis}
                 />
-                <View style={styles.chipek}>
-                  {kiadasKategoriak.map((k) => (
-                    <Chip
-                      key={k.id}
-                      selected={k.id === efKategoria}
-                      showSelectedOverlay
-                      onPress={() => setEfKategoria(k.id)}
-                    >
-                      {k.nev}
-                    </Chip>
-                  ))}
+              )}
+              {szerkesztes?.tipus === 'elofizetes' && (
+                <>
+                  <TextInput
+                    mode="outlined"
+                    label="Esedékesség napja (1–31)"
+                    keyboardType="numeric"
+                    value={nap}
+                    onChangeText={setNap}
+                  />
+                  <View style={styles.chipek}>
+                    {kiadasKategoriak.map((k) => (
+                      <Chip
+                        key={k.id}
+                        selected={k.id === efKategoria}
+                        showSelectedOverlay
+                        onPress={() => setEfKategoria(k.id)}
+                      >
+                        {k.nev}
+                      </Chip>
+                    ))}
+                  </View>
+                </>
+              )}
+              {szerkesztes?.tipus === 'keret' && (
+                <View style={styles.kapcsolo}>
+                  <Text variant="bodyLarge">Aktív</Text>
+                  <Switch value={aktiv} onValueChange={setAktiv} />
                 </View>
-              </>
-            )}
-            {szerkesztes?.tipus === 'keret' && (
-              <View style={styles.kapcsolo}>
-                <Text variant="bodyLarge">Aktív</Text>
-                <Switch value={aktiv} onValueChange={setAktiv} />
-              </View>
-            )}
+              )}
+            </Pressable>
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={bezar} disabled={mentes}>

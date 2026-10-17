@@ -1,12 +1,18 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { FAB, Portal } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function MuveletGomb() {
   const router = useRouter();
+  const pathname = usePathname();
+  const insets = useSafeAreaInsets();
+  // csak ott látszik, ahol új tételt rögzítesz; a fül sáv fölött ül, nem takarja a Beállításokat
+  const lathato = pathname === '/' || pathname === '/tranzakciok';
+  const tabSavMagassag = (Platform.OS === 'ios' ? 49 : 56) + insets.bottom;
   const [nyitva, setNyitva] = useState(false);
 
   const nyugtaKivalasztas = async (forras: 'kamera' | 'galeria') => {
@@ -50,7 +56,8 @@ export function MuveletGomb() {
     <Portal>
       <FAB.Group
         open={nyitva}
-        visible
+        visible={lathato}
+        style={{ paddingBottom: tabSavMagassag }}
         icon={nyitva ? 'close' : 'plus'}
         onStateChange={({ open }) => setNyitva(open)}
         actions={[

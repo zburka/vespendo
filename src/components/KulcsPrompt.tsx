@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, Dialog, Portal, Text, TextInput, useTheme } from 'react-native-paper';
 
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { setAppKulcs } from '../services/api';
 import { kulcsMent } from '../services/kulcs';
 import { useStore } from '../store/useStore';
@@ -12,6 +13,7 @@ export function KulcsPrompt() {
   const [kulcs, setKulcs] = useState('');
   const [probalt, setProbalt] = useState(false);
   const [mentes, setMentes] = useState(false);
+  const billentyuzet = useKeyboardHeight();
 
   const ment = async () => {
     const tiszta = kulcs.trim();
@@ -32,7 +34,7 @@ export function KulcsPrompt() {
 
   return (
     <Portal>
-      <Dialog visible={szukseges} dismissable={false}>
+      <Dialog visible={szukseges} dismissable={false} style={{ marginBottom: billentyuzet }}>
         <Dialog.Title>Alkalmazás kulcs</Dialog.Title>
         <Dialog.Content style={{ gap: 12 }}>
           <Text variant="bodyMedium">

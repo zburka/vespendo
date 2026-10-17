@@ -13,6 +13,7 @@ import {
 } from 'react-native-paper';
 
 import { SzemelyValaszto } from '../../components/SzemelyValaszto';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { N8N_BASE_URL } from '../../config';
 import { ELO_API } from '../../services/api';
 import { useStore } from '../../store/useStore';
@@ -32,6 +33,7 @@ export default function BeallitasokScreen() {
   const [szerkesztes, setSzerkesztes] = useState<{ szemely?: Szemely } | null>(null);
   const [nev, setNev] = useState('');
   const [mentes, setMentes] = useState(false);
+  const billentyuzet = useKeyboardHeight();
 
   const megnyit = (szemely?: Szemely) => {
     setNev(szemely?.nev ?? '');
@@ -118,7 +120,11 @@ export default function BeallitasokScreen() {
       <Text variant="bodySmall">VeSpendo</Text>
 
       <Portal>
-        <Dialog visible={szerkesztes !== null} onDismiss={() => !mentes && setSzerkesztes(null)}>
+        <Dialog
+          visible={szerkesztes !== null}
+          dismissable={false}
+          style={{ marginBottom: billentyuzet }}
+        >
           <Dialog.Title>{szerkesztes?.szemely ? 'Személy átnevezése' : 'Új személy'}</Dialog.Title>
           <Dialog.Content>
             <TextInput mode="outlined" label="Név" value={nev} onChangeText={setNev} autoFocus />

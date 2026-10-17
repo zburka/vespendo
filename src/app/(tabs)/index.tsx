@@ -94,18 +94,20 @@ export default function DashboardScreen() {
             Kapott: {formatFt(keszpenz.bevetel)} · Elköltött: {formatFt(keszpenz.kiadas)}
           </Text>
         </Card.Content>
-        <Card.Actions>
+        <Card.Actions style={styles.gombok}>
           <Button
+            compact
             icon="cash-plus"
             onPress={() => router.push('/uj-tetel?tipus=bevetel&mod=keszpenz')}
           >
-            Kapott készpénz
+            Kapott
           </Button>
           <Button
+            compact
             icon="cash-minus"
             onPress={() => router.push('/uj-tetel?tipus=kiadas&mod=keszpenz')}
           >
-            Készpénzes kiadás
+            Elköltött
           </Button>
         </Card.Actions>
       </Card>
@@ -240,6 +242,7 @@ function OsszegKartya({ cim, ertek, szin }: { cim: string; ertek: number; szin: 
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 12 },
+  gombok: { flexWrap: 'wrap' },
   sor: { flexDirection: 'row', gap: 12 },
   osszegKartya: { flex: 1 },
   lista: { gap: 12 },

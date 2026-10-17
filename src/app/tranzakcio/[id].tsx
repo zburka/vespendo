@@ -112,7 +112,11 @@ export default function TranzakcioSzerkeszto() {
     );
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+    >
       <Stack.Screen options={{ title: 'Tétel szerkesztése' }} />
       <Text variant="headlineSmall">
         {bevetel ? '+' : '−'}

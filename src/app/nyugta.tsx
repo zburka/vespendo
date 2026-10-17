@@ -67,7 +67,11 @@ export default function NyugtaScreen() {
   const folyamatban = fazis === 'tomorites' || fazis === 'feltoltes';
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+    >
       <Stack.Screen options={{ title: 'Nyugta rögzítése' }} />
       <Image source={{ uri }} style={styles.kep} resizeMode="cover" />
 

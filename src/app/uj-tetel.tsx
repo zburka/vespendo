@@ -85,7 +85,11 @@ export default function UjTetelScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+    >
       <SegmentedButtons
         value={tipus}
         onValueChange={(v) => setTipus(v as 'kiadas' | 'bevetel')}
