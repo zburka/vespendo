@@ -8,7 +8,8 @@ import { SzemelyValaszto } from '../../components/SzemelyValaszto';
 import { useStore } from '../../store/useStore';
 import type { FizetesiMod, Tulajdonos } from '../../types';
 import { formatFt } from '../../utils/format';
-import { kereskedoKulcs } from '../../utils/kereskedo';
+import { azonnaliTetel, kereskedoKulcs } from '../../utils/kereskedo';
+import { QvikLogo } from '../../components/QvikLogo';
 
 export default function TranzakcioSzerkeszto() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -120,10 +121,13 @@ export default function TranzakcioSzerkeszto() {
       automaticallyAdjustKeyboardInsets
     >
       <Stack.Screen options={{ title: 'Tétel szerkesztése' }} />
-      <Text variant="headlineSmall">
-        {bevetel ? '+' : '−'}
-        {formatFt(Number(osszeg.replace(/[\s ]/g, '').replace(',', '.')) || 0)}
-      </Text>
+      <View style={styles.osszegSor}>
+        <Text variant="headlineSmall">
+          {bevetel ? '+' : '−'}
+          {formatFt(Number(osszeg.replace(/[\s ]/g, '').replace(',', '.')) || 0)}
+        </Text>
+        {azonnaliTetel(tranzakcio) && <QvikLogo magassag={30} />}
+      </View>
 
       <TextInput mode="outlined" label="Megnevezés" value={nev} onChangeText={setNev} />
       <TextInput
@@ -207,6 +211,7 @@ export default function TranzakcioSzerkeszto() {
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 8 },
   cim: { marginTop: 12 },
+  osszegSor: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chipek: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   gomb: { marginTop: 24 },
 });

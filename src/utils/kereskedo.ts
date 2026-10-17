@@ -67,3 +67,13 @@ export function devizaInfo(...szovegek: (string | undefined)[]): string | null {
     ? `${ertek.toFixed(2).replace('.', ',')} ${m[3].toUpperCase()}`
     : null;
 }
+
+/**
+ * Azonnali fizetési rendszeren (AFR) feldolgozott tétel? A bank tranzakciótípusa a névben vagy a megjegyzés elején áll
+ * ('AZONNALI FIZETÉS BANKON BELÜL', 'QVIK FIZETÉS BANKON BELÜL'). Ezeknél kötelező a qvik logó megjelenítése.
+ * A 'NAPKÖZBENI ÁTUTALÁS' nem azonnali fizetés.
+ */
+export function azonnaliTetel(t: { kereskedo: string; megjegyzes?: string }): boolean {
+  const azonnali = /^\s*(azonnali fizetés|qvik fizetés)/i;
+  return azonnali.test(t.kereskedo) || azonnali.test(t.megjegyzes ?? '');
+}

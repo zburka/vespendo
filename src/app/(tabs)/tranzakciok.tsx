@@ -6,11 +6,12 @@ import { Chip, Divider, List, Text, useTheme } from 'react-native-paper';
 
 import { AdatAllapot } from '../../components/AdatAllapot';
 import { HonapValaszto } from '../../components/HonapValaszto';
+import { QvikLogo } from '../../components/QvikLogo';
 import { SzemelyValaszto } from '../../components/SzemelyValaszto';
 import { useStore } from '../../store/useStore';
 import type { Tranzakcio } from '../../types';
 import { formatFt, formatNap } from '../../utils/format';
-import { devizaInfo, megjelenitettNev } from '../../utils/kereskedo';
+import { azonnaliTetel, devizaInfo, megjelenitettNev } from '../../utils/kereskedo';
 import { szemelyNev } from '../../utils/szemely';
 
 export default function TranzakciokScreen() {
@@ -94,16 +95,16 @@ export default function TranzakciokScreen() {
                 />
               )}
               right={() => (
-                <Text
-                  variant="bodyLarge"
-                  style={{
-                    color: bevetel ? '#2e7d32' : theme.colors.onSurface,
-                    alignSelf: 'center',
-                  }}
-                >
-                  {bevetel ? '+' : '−'}
-                  {formatFt(item.osszeg)}
-                </Text>
+                <View style={styles.osszegOszlop}>
+                  <Text
+                    variant="bodyLarge"
+                    style={{ color: bevetel ? '#2e7d32' : theme.colors.onSurface }}
+                  >
+                    {bevetel ? '+' : '−'}
+                    {formatFt(item.osszeg)}
+                  </Text>
+                  {azonnaliTetel(item) && <QvikLogo />}
+                </View>
               )}
               onPress={() => router.push(`/tranzakcio/${item.id}`)}
             />
@@ -118,6 +119,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   fejlec: { padding: 16, paddingBottom: 8, gap: 8 },
   szuroSor: { flexDirection: 'row' },
+  osszegOszlop: { alignItems: 'flex-end', justifyContent: 'center', gap: 4 },
   szekcio: { paddingHorizontal: 16, paddingVertical: 6 },
   ikon: { alignSelf: 'center', marginLeft: 8 },
   ures: { textAlign: 'center', marginTop: 32 },
