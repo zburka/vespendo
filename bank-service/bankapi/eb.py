@@ -164,14 +164,28 @@ def normalizal(t: dict) -> dict | None:
         return None
     bevetel = t.get("credit_debit_indicator") == "CRDT"
     partner = (t.get("debtor") if bevetel else t.get("creditor")) or {}
-    kozlemeny = " ".join(x.strip() for x in (t.get("remittance_information") or []) if x and x.strip())
-    nev = (partner.get("name") or "").strip() or kozlemeny[:80] or "Ismeretlen"
+    partner_nev = (partner.get("name") or "").strip()
+    # a bank tranzakciótípusa (pl. 'AZONNALI FIZETÉS BANKON BELÜL', 'ÁRUVÁSÁRLÁSI HITEL TÖRL.') mondja meg, mi a tétel
+    bt = ((t.get("bank_transaction_code") or {}).get("description") or "").strip()
+    if partner_nev.upper() == bt.upper():  # pl. visszatérítésnél a bank a típust adja névként: ne írjuk ki duplán
+        partner_nev = ""
+    kozl = " ".join(x.strip() for x in (t.get("remittance_information") or []) if x and x.strip())
     deviza = ta.get("currency")
+    # kártyás vásárlás: a típus vagy a közlemény mintája ('ÉÉÉÉ.HH.NN <kártya/hivatkozás szám> <kereskedő> -APPLE')
+    kartya = bt.upper().startswith("VÁSÁRLÁS KÁRTYÁVAL") or bool(re.match(r"^\d{4}\.\d{2}\.\d{2}\s+\d{6,}", kozl))
+    if kartya:
+        nev = partner_nev or kozl[:80] or "Ismeretlen"
+    else:  # a PDF-es névvel azonos szerkezet: '<típus>, <partner>'
+        nev = ", ".join(x for x in (bt, partner_nev) if x) or kozl[:80] or "Ismeretlen"
+    reszek = [bt] if bt else []
+    if partner_nev:
+        reszek.append(f"{'Feladó' if bevetel else 'Kedvezményezett'}: {partner_nev}")
+    if kozl:
+        reszek.append(f"Közlemény: {kozl}")
     if deviza and deviza != "HUF":
-        kozlemeny = f"{kozlemeny} [{ta.get('amount')} {deviza}]".strip()
+        reszek.append(f"{ta.get('amount')} {deviza}")
+    kozlemeny = " | ".join(reszek)
     ref = t.get("entry_reference") or t.get("transaction_id")
-    # kártyás vásárlás az OTP közleményében: 'ÉÉÉÉ.HH.NN <kártya/hivatkozás szám> <kereskedő> -APPLE'; minden más átutalás
-    kartya = bool(re.match(r"^\d{4}\.\d{2}\.\d{2}\s+\d{6,}", kozlemeny))
     return {
         "datum": datum,
         "osszeg": round(osszeg, 2),

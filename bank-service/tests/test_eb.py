@@ -54,7 +54,7 @@ def test_normalizal_kiadas_bevetel_fuggoben_deviza():
     ki = eb.normalizal({"entry_reference": "R1", "booking_date": "2026-10-01", "status": "BOOK", "credit_debit_indicator": "DBIT",
                         "transaction_amount": {"amount": "1290.00", "currency": "HUF"}, "creditor": {"name": "Lidl"},
                         "remittance_information": ["Vásárlás", "kártyával"]})
-    assert ki == {"datum": "2026-10-01", "osszeg": 1290.0, "kereskedo_nyers": "Lidl", "kozlemeny": "Vásárlás kártyával",
+    assert ki == {"datum": "2026-10-01", "osszeg": 1290.0, "kereskedo_nyers": "Lidl", "kozlemeny": "Kedvezményezett: Lidl | Közlemény: Vásárlás kártyával",
                   "irany": "kiadas", "kulcs": "eb:R1", "penznem": "HUF", "fizetesi_mod": "atutalas"}
     be = eb.normalizal({"transaction_id": "T9", "value_date": "2026-10-02", "credit_debit_indicator": "CRDT",
                         "transaction_amount": {"amount": "500000", "currency": "HUF"}, "debtor": {"name": "Munkaadó Kft"},
@@ -64,7 +64,7 @@ def test_normalizal_kiadas_bevetel_fuggoben_deviza():
     assert eb.normalizal({"booking_date": "2026-10-01", "transaction_amount": {"amount": "0", "currency": "HUF"}}) is None
     fx = eb.normalizal({"booking_date": "2026-10-01", "credit_debit_indicator": "DBIT", "transaction_amount": {"amount": "10.96", "currency": "EUR"},
                         "creditor": {"name": "Tractive"}, "remittance_information": []})
-    assert "[10.96 EUR]" in fx["kozlemeny"] and fx["penznem"] == "EUR" and fx["kulcs"] is None
+    assert "10.96 EUR" in fx["kozlemeny"] and fx["penznem"] == "EUR" and fx["kulcs"] is None
 
 
 def test_tranzakciok_lapozas(konfig, monkeypatch):
@@ -117,3 +117,30 @@ def test_kartyas_vasarlas_felismerese_a_kozlemenybol():
                               "transaction_amount": {"amount": "2721", "currency": "HUF"}, "creditor": {"name": "OTP BANK NYRT."},
                               "remittance_information": ["9801804086826482BIZT"]})
     assert atutalas["fizetesi_mod"] == "atutalas"
+
+
+def test_tranzakciotipus_a_nevben_es_a_megjegyzesben():
+    """Az OTP bank_transaction_code leírása mondja meg a tétel fajtáját; a megjegyzés ne csak azonosító legyen."""
+    hitel = eb.normalizal({"entry_reference": "H1", "booking_date": "2026-10-12", "credit_debit_indicator": "DBIT",
+                           "transaction_amount": {"amount": "22894.0", "currency": "HUF"}, "creditor": {"name": "OTP BANK NYRT."},
+                           "bank_transaction_code": {"description": "ÁRUVÁSÁRLÁSI HITEL TÖRL.", "code": "CBDD"},
+                           "remittance_information": ["9801704123370946"]})
+    assert hitel["kereskedo_nyers"] == "ÁRUVÁSÁRLÁSI HITEL TÖRL., OTP BANK NYRT."
+    assert hitel["kozlemeny"] == "ÁRUVÁSÁRLÁSI HITEL TÖRL. | Kedvezményezett: OTP BANK NYRT. | Közlemény: 9801704123370946"
+    assert hitel["fizetesi_mod"] == "atutalas"
+    utalas = eb.normalizal({"entry_reference": "U1", "booking_date": "2026-10-09", "credit_debit_indicator": "DBIT",
+                            "transaction_amount": {"amount": "350000.0", "currency": "HUF"}, "creditor": {"name": "JODIA Kft."},
+                            "bank_transaction_code": {"description": "AZONNALI FIZETÉS BANKON BELÜL", "code": "324"},
+                            "remittance_information": ["BSZ/00216"]})
+    assert utalas["kereskedo_nyers"] == "AZONNALI FIZETÉS BANKON BELÜL, JODIA Kft."
+    kartya = eb.normalizal({"entry_reference": "C1", "booking_date": "2026-10-07", "credit_debit_indicator": "DBIT",
+                            "transaction_amount": {"amount": "2880.0", "currency": "HUF"}, "creditor": {"name": "Allegro"},
+                            "bank_transaction_code": {"description": "VÁSÁRLÁS KÁRTYÁVAL", "code": "764"},
+                            "remittance_information": ["2026.10.05 6296949233 Allegro                  -APPLE"]})
+    assert kartya["kereskedo_nyers"] == "Allegro" and kartya["fizetesi_mod"] == "kartya"
+    assert kartya["kozlemeny"].startswith("VÁSÁRLÁS KÁRTYÁVAL | Kedvezményezett: Allegro | Közlemény: 2026.10.05")
+    bevetel = eb.normalizal({"entry_reference": "B1", "booking_date": "2026-10-02", "credit_debit_indicator": "CRDT",
+                             "transaction_amount": {"amount": "682317.0", "currency": "HUF"}, "debtor": {"name": "ISOLUTIONS Kft."},
+                             "bank_transaction_code": {"description": "NAPKÖZBENI ÁTUTALÁS", "code": "1"},
+                             "remittance_information": ["08. havi munkabér"]})
+    assert bevetel["kozlemeny"] == "NAPKÖZBENI ÁTUTALÁS | Feladó: ISOLUTIONS Kft. | Közlemény: 08. havi munkabér"
