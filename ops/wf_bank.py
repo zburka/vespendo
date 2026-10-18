@@ -73,7 +73,8 @@ const letezo = $input.all().flatMap(i => i.json.results || []);
 const uj = [], frissit = [];
 for (const a of s.szamlak) {
   const sor = { haztartas: hz, azonosito: `${s.session_id}:${a.uid}`.slice(0, 120), szemely, alkalmazas: s.alkalmazas || 'alap', session_id: s.session_id, szamla_uid: a.uid, iban: a.iban || '', lejarat: s.valid_until || '', aktiv: true };
-  const ex = letezo.find(r => r.szamla_uid === a.uid);
+  // újrajóváhagyáskor a bank új számla-azonosítót adhat: ugyanazon IBAN-hoz tartozó meglévő kapcsolatot frissítjük (nem keletkezik elavult kapcsolat)
+const ex = letezo.find(r => r.szamla_uid === a.uid || (a.iban && r.iban === a.iban && r.szemely === szemely));
   if (ex) frissit.push({ id: ex.id, ...sor }); else uj.push({ ...sor, utolso_szinkron: '' });
 }
 return [{ json: { uj, frissit, szemely, szamlak: s.szamlak.length } }];
