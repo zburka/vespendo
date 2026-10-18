@@ -21,7 +21,7 @@ export default function ImportScreen() {
 
   const [fazis, setFazis] = useState<Fazis>('beolvasas');
   const [csv, setCsv] = useState<NonNullable<FajlElemzesValasz['data']> | null>(null);
-  const [feltolto, setFeltolto] = useState<string>(useStore.getState().szerep ?? 'ferj');
+  const [feltolto, setFeltolto] = useState<string>(useStore.getState().szerep ?? useStore.getState().szemelyek.find((p) => p.aktiv && p.kulcs !== 'kozos')?.kulcs ?? '');
   const [osszegzes, setOsszegzes] = useState<ImportOsszegzes | null>(null);
   const [hiba, setHiba] = useState('');
 

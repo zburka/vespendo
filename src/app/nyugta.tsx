@@ -25,7 +25,7 @@ export default function NyugtaScreen() {
   const betoltes = useStore((s) => s.betoltes);
 
   const [megjegyzes, setMegjegyzes] = useState('');
-  const [feltolto, setFeltolto] = useState<string>(useStore.getState().szerep ?? 'ferj');
+  const [feltolto, setFeltolto] = useState<string>(useStore.getState().szerep ?? useStore.getState().szemelyek.find((p) => p.aktiv && p.kulcs !== 'kozos')?.kulcs ?? '');
   const [fazis, setFazis] = useState<Fazis>('szerkesztes');
   const [valasz, setValasz] = useState<NyugtaValasz['data'] | null>(null);
   const [hiba, setHiba] = useState('');

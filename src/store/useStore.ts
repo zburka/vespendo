@@ -16,12 +16,23 @@ import {
   ELO_API,
   elofizetesMentes,
   elofizetesTorles,
-  HibasKulcs,
   keretMentes,
   szemelyMentes,
   tranzakciokLekeres,
 } from '../services/api';
-import { elutasitottMent, szerepMent } from '../services/kulcs';
+import {
+  belepes as authBelepes,
+  kilepes as authKilepes,
+  NincsBelepes,
+  onKilepett,
+  type Profil,
+  profil as authProfil,
+  regisztracio as authRegisztracio,
+  type RegisztraciosAdat,
+  szemelyKapcsolas,
+  vanMunkamenet,
+} from '../services/auth';
+import { elutasitottMent } from '../services/kulcs';
 import { alkalmazImport } from '../services/mockImport';
 import type {
   BankiImportKeres,
@@ -56,13 +67,22 @@ interface State {
   kategoriaSzuro: string | null;
   setKategoriaSzuro: (id: string | null) => void;
   /** Új személy (kulcs nélkül) vagy átnevezés / kikapcsolás. */
-  mentSzemely: (kulcs: string | undefined, nev: string, aktiv: boolean) => Promise<void>;
+  mentSzemely: (kulcs: string | undefined, nev: string, aktiv: boolean) => Promise<string | null>;
   /** Élő módban: töltés állapota és az utolsó hiba. */
   toltes: boolean;
   hiba: string | null;
-  /** Az n8n elutasította a kulcsot (vagy nincs): az app bekéri. */
-  kulcsSzukseges: boolean;
-  setKulcsSzukseges: (ertek: boolean) => void;
+  /** Belépési állapot: induláskor 'betolt', majd 'kilepve' (belépőképernyő), 'belepve' vagy 'hiba' (nincs kapcsolat). */
+  munkamenet: 'betolt' | 'kilepve' | 'belepve' | 'hiba';
+  munkamenetHiba: string | null;
+  /** A bejelentkezett felhasználó, háztartása és tagjai (mock módban null). */
+  en: Profil | null;
+  /** Induláskor: van-e eltárolt belépés, és érvényes-e. */
+  munkamenetInditas: () => Promise<void>;
+  belepes: (email: string, jelszo: string) => Promise<void>;
+  regisztracio: (adatok: RegisztraciosAdat) => Promise<void>;
+  kilepes: () => Promise<void>;
+  setEn: (en: Profil) => void;
+  profilFrissit: () => Promise<void>;
   /** Élő módban a szerverről (n8n) tölti be az adatokat; mock módban nem csinál semmit. */
   betoltes: () => Promise<void>;
   /** Keret létrehozása/módosítása egy kategóriára (élő módban a szerverre is ment, majd újratölt). */
@@ -94,6 +114,23 @@ interface State {
   modositKategoria: (id: string, ujKategoriaId: string) => void;
 }
 
+/** Kilépéskor / felhasználóváltáskor a háztartás adatai nem maradhatnak a memóriában. */
+function adatTorles() {
+  elsoBetoltes = true;
+  useStore.setState({
+    kategoriak: [],
+    tranzakciok: [],
+    keretek: [],
+    elofizetesek: [],
+    celok: [],
+    szabalyok: [],
+    szemelyek: [],
+    kategoriaSzuro: null,
+    szuro: 'mind',
+    hiba: null,
+  });
+}
+
 export const useStore = create<State>((set, get) => ({
   honap: aktualisHonap(),
   szuro: 'mind',
@@ -109,20 +146,68 @@ export const useStore = create<State>((set, get) => ({
   setKategoriaSzuro: (kategoriaSzuro) => set({ kategoriaSzuro }),
   mentSzemely: async (kulcs, nev, aktiv) => {
     if (ELO_API) {
-      await szemelyMentes({ kulcs, nev, aktiv });
+      const uj = await szemelyMentes({ kulcs, nev, aktiv });
       await get().betoltes();
-      return;
+      return uj ?? kulcs ?? null;
     }
+    const ujKulcs = kulcs ?? `szemely${Date.now()}`;
     set((s) => ({
       szemelyek: kulcs
         ? s.szemelyek.map((x) => (x.kulcs === kulcs ? { ...x, nev, aktiv } : x))
-        : [...s.szemelyek, { kulcs: `szemely${Date.now()}`, nev, aktiv }],
+        : [...s.szemelyek, { kulcs: ujKulcs, nev, aktiv }],
     }));
+    return ujKulcs;
   },
   toltes: false,
   hiba: null,
-  kulcsSzukseges: false,
-  setKulcsSzukseges: (kulcsSzukseges) => set({ kulcsSzukseges }),
+  munkamenet: ELO_API ? 'betolt' : 'belepve',
+  munkamenetHiba: null,
+  en: null,
+  setEn: (en) => set({ en, szerep: en.haztartas.szemely_kulcs, szerepSzukseges: !en.haztartas.szemely_kulcs }),
+  munkamenetInditas: async () => {
+    if (!ELO_API) return;
+    set({ munkamenet: 'betolt', munkamenetHiba: null });
+    try {
+      if (!(await vanMunkamenet())) {
+        set({ munkamenet: 'kilepve' });
+        return;
+      }
+      const en = await authProfil();
+      get().setEn(en);
+      set({ munkamenet: 'belepve' });
+      await get().betoltes();
+    } catch (e) {
+      if (e instanceof NincsBelepes) set({ munkamenet: 'kilepve' });
+      else
+        set({
+          munkamenet: 'hiba',
+          munkamenetHiba: e instanceof Error ? e.message : 'A szerver nem érhető el',
+        });
+    }
+  },
+  belepes: async (email, jelszo) => {
+    const en = await authBelepes(email, jelszo);
+    adatTorles();
+    get().setEn(en);
+    set({ munkamenet: 'belepve' });
+    await get().betoltes();
+  },
+  regisztracio: async (adatok) => {
+    const en = await authRegisztracio(adatok);
+    adatTorles();
+    get().setEn(en);
+    set({ munkamenet: 'belepve' });
+    await get().betoltes();
+  },
+  kilepes: async () => {
+    await authKilepes();
+    adatTorles();
+    set({ munkamenet: 'kilepve', en: null, szerep: null, szerepSzukseges: false });
+  },
+  profilFrissit: async () => {
+    if (!ELO_API) return;
+    get().setEn(await authProfil());
+  },
   betoltes: async () => {
     if (!ELO_API) return;
     set({ toltes: true, hiba: null });
@@ -139,8 +224,8 @@ export const useStore = create<State>((set, get) => ({
         }
       }
     } catch (e) {
-      if (e instanceof HibasKulcs) {
-        set({ toltes: false, kulcsSzukseges: true });
+      if (e instanceof NincsBelepes) {
+        set({ toltes: false, munkamenet: 'kilepve' });
         return;
       }
       set({
@@ -202,12 +287,12 @@ export const useStore = create<State>((set, get) => ({
   szerep: null,
   szerepSzukseges: false,
   setSzerep: async (szerep) => {
-    set({ szerep, szerepSzukseges: false });
-    try {
-      await szerepMent(szerep);
-    } catch {
-      // a tároló nem érhető el: a beállítás csak az aktuális munkamenetre él
+    if (ELO_API) {
+      // a személy a fiókhoz kötődik (a szerveren), nem a telefonhoz
+      get().setEn(await szemelyKapcsolas(szerep));
+      return;
     }
+    set({ szerep, szerepSzukseges: false });
   },
   setSzerepSzukseges: (szerepSzukseges) => set({ szerepSzukseges }),
   mentElofizetes: async (e) => {
@@ -282,3 +367,6 @@ export const useStore = create<State>((set, get) => ({
       };
     }),
 }));
+
+// ha a szerver a munkamenetet véglegesen érvénytelennek mondja (pl. másik eszközről kijelentkeztették), vissza a belépéshez
+onKilepett(() => useStore.setState({ munkamenet: 'kilepve' }));

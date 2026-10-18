@@ -146,20 +146,32 @@ export default function DashboardScreen() {
           {kategoriaBontas.length === 0 && (
             <Text variant="bodyMedium">Ebben a hónapban nincs kiadás.</Text>
           )}
-          {kategoriaBontas.map((k) => (
-            <Pressable key={k.id} onPress={() => szuresKategoriara(k.id)}>
-              <View style={styles.keret}>
-                <View style={styles.keretFejlec}>
-                  <Text variant="bodyLarge">{k.nev}</Text>
-                  <Text variant="bodySmall">{formatFt(k.osszeg)}</Text>
+          {kategoriaBontas.map((k) => {
+            // ahol van költségkeret, ugyanaz a sáv látszik piros határvonallal, mint a Költségkereteknél
+            const keret = o.keretek.find((x) => x.kategoria === k.nev);
+            return (
+              <Pressable key={k.id} onPress={() => szuresKategoriara(k.id)}>
+                <View style={styles.keret}>
+                  <View style={styles.keretFejlec}>
+                    <Text variant="bodyLarge">{k.nev}</Text>
+                    <Text variant="bodySmall">
+                      {keret
+                        ? `${formatFt(k.osszeg)} / ${formatFt(keret.havi_keret)} (${keret.szazalek}%)`
+                        : formatFt(k.osszeg)}
+                    </Text>
+                  </View>
+                  {keret ? (
+                    <KeretSav elkoltve={k.osszeg} keret={keret.havi_keret} />
+                  ) : (
+                    <ProgressBar
+                      progress={kategoriaOsszeg > 0 ? k.osszeg / kategoriaOsszeg : 0}
+                      style={styles.sav}
+                    />
+                  )}
                 </View>
-                <ProgressBar
-                  progress={kategoriaOsszeg > 0 ? k.osszeg / kategoriaOsszeg : 0}
-                  style={styles.sav}
-                />
-              </View>
-            </Pressable>
-          ))}
+              </Pressable>
+            );
+          })}
         </Card.Content>
       </Card>
 

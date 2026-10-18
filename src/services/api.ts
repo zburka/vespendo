@@ -1,4 +1,5 @@
-import { MOCK_MOD, N8N_APP_KEY_ENV, N8N_BASE_URL } from '../config';
+import { MOCK_MOD } from '../config';
+import { hitelesitettFetch } from './auth';
 import type {
   Alapadatok,
   BankiImportKeres,
@@ -16,21 +17,6 @@ import type {
 /** Alapból élő módban fut; mock adatokkal csak `EXPO_PUBLIC_MOCK=1` esetén. */
 export const ELO_API = !MOCK_MOD;
 
-/** Az `X-App-Key` fejléc értéke. Az app indításkor tölti be a telefon biztonságos tárolójából. */
-let appKulcs = N8N_APP_KEY_ENV;
-export const setAppKulcs = (kulcs: string) => {
-  appKulcs = kulcs;
-};
-export const vanAppKulcs = () => appKulcs !== '';
-
-/** A szerver elutasította az alkalmazás kulcsát (hiányzik vagy hibás). */
-export class HibasKulcs extends Error {
-  constructor() {
-    super('Hibás vagy hiányzó alkalmazás kulcs');
-    this.name = 'HibasKulcs';
-  }
-}
-
 const IDOTUL_MS = 60_000;
 
 async function keres<T>(
@@ -40,16 +26,16 @@ async function keres<T>(
   const vezerlo = new AbortController();
   const idozito = setTimeout(() => vezerlo.abort(), opciok.idotulMs ?? IDOTUL_MS);
   try {
-    const res = await fetch(`${N8N_BASE_URL}/webhook/${utvonal}`, {
+    // a belépési kapu ellenőrzi a belépést és a háztartást, majd továbbítja a kérést az n8n-nek
+    const res = await hitelesitettFetch(`/api/v/${utvonal}`, {
       method: opciok.method,
-      headers: { 'Content-Type': 'application/json', 'X-App-Key': appKulcs },
+      headers: { 'Content-Type': 'application/json' },
       body: opciok.body === undefined ? undefined : JSON.stringify(opciok.body),
       signal: vezerlo.signal,
     });
-    if (res.status === 401 || res.status === 403) throw new HibasKulcs();
     if (!res.ok) {
       const hibaTest = await res.json().catch(() => null);
-      throw new Error(hibaTest?.uzenet ?? `A szerver hibát jelzett (${res.status})`);
+      throw new Error(hibaTest?.uzenet ?? hibaTest?.hiba ?? `A szerver hibát jelzett (${res.status})`);
     }
     return (await res.json()) as T;
   } catch (e) {
@@ -62,7 +48,7 @@ async function keres<T>(
 
 const kesleltet = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** `POST /webhook/nyugta-feltoltes` */
+/** `POST /api/v/nyugta-feltoltes` */
 export async function feltoltNyugta(body: NyugtaKeres): Promise<NyugtaValasz> {
   if (ELO_API) return keres('nyugta-feltoltes', { method: 'POST', body });
 
@@ -84,7 +70,7 @@ export async function feltoltNyugta(body: NyugtaKeres): Promise<NyugtaValasz> {
 }
 
 /**
- * `POST /webhook/banki-fajl-elemzes`: bármilyen banki kivonat (PDF / XLSX / CSV) elemzése a szerveren
+ * `POST /api/v/banki-fajl-elemzes`: bármilyen banki kivonat (PDF / XLSX / CSV) elemzése a szerveren
  * (token nélküli Python script). Csak élő módban hívható.
  */
 export async function elemezBankiFajl(body: FajlElemzesKeres) {
@@ -96,7 +82,7 @@ export async function elemezBankiFajl(body: FajlElemzesKeres) {
 }
 
 /**
- * `POST /webhook/banki-import`. Élő módban az n8n összegzését adja vissza, mock módban `null`
+ * `POST /api/v/banki-import`. Élő módban az n8n összegzését adja vissza, mock módban `null`
  * (ekkor a store helyi logikája dolgozik).
  */
 export async function bankiImport(body: BankiImportKeres): Promise<ImportOsszegzes | null> {
@@ -111,28 +97,28 @@ export async function bankiImport(body: BankiImportKeres): Promise<ImportOsszegz
   return null;
 }
 
-/** `GET /webhook/adatok`: kategóriák, keretek, előfizetések, célok, szabályok. */
+/** `GET /api/v/adatok`: kategóriák, keretek, előfizetések, célok, szabályok. */
 export function alapadatok(): Promise<Alapadatok> {
   return keres('adatok', { method: 'GET' });
 }
 
-/** `GET /webhook/tranzakciok[?honap=YYYY-MM]` */
+/** `GET /api/v/tranzakciok[?honap=YYYY-MM]` */
 export function tranzakciokLekeres(honap?: string): Promise<{ tranzakciok: Tranzakcio[] }> {
   return keres(`tranzakciok${honap ? `?honap=${honap}` : ''}`, { method: 'GET' });
 }
 
-/** `GET /webhook/havi-osszesito?honap=YYYY-MM`. Mock módban nem hívható. */
+/** `GET /api/v/havi-osszesito?honap=YYYY-MM`. Mock módban nem hívható. */
 export function haviOsszesito(honap: string): Promise<HaviOsszesito> {
   return keres(`havi-osszesito?honap=${encodeURIComponent(honap)}`, { method: 'GET' });
 }
 
-/** `POST /webhook/kategoria-modositas`. Mock módban nincs teendő. */
+/** `POST /api/v/kategoria-modositas`. Mock módban nincs teendő. */
 export async function kategoriaModositas(body: KategoriaModositasKeres): Promise<void> {
   if (!ELO_API) return;
   await keres<unknown>('kategoria-modositas', { method: 'POST', body });
 }
 
-/** `POST /webhook/keret-mentes`: egy kategória havi keretének létrehozása vagy módosítása. Mock módban nincs teendő. */
+/** `POST /api/v/keret-mentes`: egy kategória havi keretének létrehozása vagy módosítása. Mock módban nincs teendő. */
 export async function keretMentes(body: {
   kategoria_id: string;
   nev: string;
@@ -143,7 +129,7 @@ export async function keretMentes(body: {
   await keres<unknown>('keret-mentes', { method: 'POST', body });
 }
 
-/** `POST /webhook/cel-mentes`: megtakarítási cél létrehozása (id nélkül) vagy módosítása. */
+/** `POST /api/v/cel-mentes`: megtakarítási cél létrehozása (id nélkül) vagy módosítása. */
 export async function celMentes(body: {
   id?: string;
   cel_neve: string;
@@ -154,19 +140,19 @@ export async function celMentes(body: {
   await keres<unknown>('cel-mentes', { method: 'POST', body });
 }
 
-/** `POST /webhook/cel-torles` */
+/** `POST /api/v/cel-torles` */
 export async function celTorles(id: string): Promise<void> {
   if (!ELO_API) return;
   await keres<unknown>('cel-torles', { method: 'POST', body: { id } });
 }
 
-/** `POST /webhook/tranzakcio-felvetel`: kézi tétel rögzítése. Mock módban nincs teendő (a store rögzíti helyben). */
+/** `POST /api/v/tranzakcio-felvetel`: kézi tétel rögzítése. Mock módban nincs teendő (a store rögzíti helyben). */
 export async function ujTranzakcio(body: UjTranzakcioKeres): Promise<void> {
   if (!ELO_API) return;
   await keres<unknown>('tranzakcio-felvetel', { method: 'POST', body });
 }
 
-/** `POST /webhook/elofizetes-mentes`: létrehozás (id nélkül) vagy módosítás. */
+/** `POST /api/v/elofizetes-mentes`: létrehozás (id nélkül) vagy módosítás. */
 export async function elofizetesMentes(body: {
   id?: string;
   megnevezes: string;
@@ -178,13 +164,13 @@ export async function elofizetesMentes(body: {
   await keres<unknown>('elofizetes-mentes', { method: 'POST', body });
 }
 
-/** `POST /webhook/elofizetes-torles` */
+/** `POST /api/v/elofizetes-torles` */
 export async function elofizetesTorles(id: string): Promise<void> {
   if (!ELO_API) return;
   await keres<unknown>('elofizetes-torles', { method: 'POST', body: { id } });
 }
 
-/** `POST /webhook/tranzakcio-modositas`: név, összeg, dátum, megjegyzés, fizetési mód módosítása. */
+/** `POST /api/v/tranzakcio-modositas`: név, összeg, dátum, megjegyzés, fizetési mód módosítása. */
 export async function tranzakcioModositas(body: {
   id: string;
   kereskedo?: string;
@@ -197,13 +183,13 @@ export async function tranzakcioModositas(body: {
   await keres<unknown>('tranzakcio-modositas', { method: 'POST', body });
 }
 
-/** `POST /webhook/tranzakcio-torles` */
+/** `POST /api/v/tranzakcio-torles` */
 export async function tranzakcioTorles(id: string): Promise<void> {
   if (!ELO_API) return;
   await keres<unknown>('tranzakcio-torles', { method: 'POST', body: { id } });
 }
 
-/** `POST /webhook/szemely-mentes`: új személy (kulcs nélkül) vagy átnevezés / kikapcsolás. Visszaadja a kulcsot. */
+/** `POST /api/v/szemely-mentes`: új személy (kulcs nélkül) vagy átnevezés / kikapcsolás. Visszaadja a kulcsot. */
 export async function szemelyMentes(body: {
   kulcs?: string;
   nev: string;
@@ -233,20 +219,20 @@ export interface BankSzinkronEredmeny {
   letoltott: number;
 }
 
-/** `GET /webhook/bank-allapot`: az összekötött bankszámlák és a hozzáférés lejárata. */
+/** `GET /api/v/bank-allapot`: az összekötött bankszámlák és a hozzáférés lejárata. */
 export async function bankAllapot(): Promise<BankKapcsolat[]> {
   if (!ELO_API) return [];
   const v = await keres<{ kapcsolatok: BankKapcsolat[] }>('bank-allapot', { method: 'GET' });
   return v.kapcsolatok;
 }
 
-/** `POST /webhook/bank-osszekotes`: a bank jóváhagyási hivatkozása (böngészőben kell megnyitni). */
+/** `POST /api/v/bank-osszekotes`: a bank jóváhagyási hivatkozása (böngészőben kell megnyitni). */
 export async function bankOsszekotes(szemely: string): Promise<string> {
   const v = await keres<{ url: string }>('bank-osszekotes', { method: 'POST', body: { szemely } });
   return v.url;
 }
 
-/** `POST /webhook/bank-szinkron`: az új banki tételek letöltése és importálása (kézi indítás). */
+/** `POST /api/v/bank-szinkron`: az új banki tételek letöltése és importálása (kézi indítás). */
 export async function bankSzinkron(): Promise<BankSzinkronEredmeny[]> {
   const v = await keres<{ kapcsolatok: BankSzinkronEredmeny[] }>('bank-szinkron', {
     method: 'POST',

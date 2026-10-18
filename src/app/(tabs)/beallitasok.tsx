@@ -13,10 +13,13 @@ import {
   TextInput,
 } from 'react-native-paper';
 
+import { ApiTokenKartya } from '../../components/ApiTokenKartya';
 import { BankKartya } from '../../components/BankKartya';
+import { FiokKartya } from '../../components/FiokKartya';
+import { HaztartasKartya } from '../../components/HaztartasKartya';
 import { SzemelyValaszto } from '../../components/SzemelyValaszto';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
-import { N8N_BASE_URL } from '../../config';
+import { API_ALAP_URL } from '../../config';
 import { ELO_API } from '../../services/api';
 import { useStore } from '../../store/useStore';
 import type { Szemely } from '../../types';
@@ -26,7 +29,7 @@ export default function BeallitasokScreen() {
   const setSzerep = useStore((s) => s.setSzerep);
   const szemelyek = useStore((s) => s.szemelyek);
   const mentSzemely = useStore((s) => s.mentSzemely);
-  const setKulcsSzukseges = useStore((s) => s.setKulcsSzukseges);
+  const bankEngedelyezett = useStore((s) => s.en?.haztartas.bank_engedelyezett ?? !ELO_API);
   const betoltes = useStore((s) => s.betoltes);
   const toltes = useStore((s) => s.toltes);
   const tetelszam = useStore((s) => s.tranzakciok.length);
@@ -65,7 +68,7 @@ export default function BeallitasokScreen() {
           subtitle="Az importoknál és az új tételeknél ez az alapértelmezett"
         />
         <Card.Content>
-          <SzemelyValaszto ertek={szerep ?? ''} onChange={setSzerep} kozos={false} />
+          <SzemelyValaszto ertek={szerep ?? ''} onChange={(k) => void setSzerep(k).catch(hiba)} kozos={false} />
         </Card.Content>
       </Card>
 
@@ -85,7 +88,7 @@ export default function BeallitasokScreen() {
                   p.kulcs === 'kozos' ? null : (
                     <Switch
                       value={p.aktiv}
-                      onValueChange={(aktiv) => mentSzemely(p.kulcs, p.nev, aktiv).catch(hiba)}
+                      onValueChange={(aktiv) => void mentSzemely(p.kulcs, p.nev, aktiv).catch(hiba)}
                     />
                   )
                 }
@@ -101,23 +104,27 @@ export default function BeallitasokScreen() {
         </Card.Actions>
       </Card>
 
-      <BankKartya />
+      {ELO_API && <FiokKartya />}
+      {ELO_API && <HaztartasKartya />}
+
+      {bankEngedelyezett && <BankKartya />}
+
+      {ELO_API && <ApiTokenKartya />}
 
       <Card>
         <Card.Title title="Szerver" />
         <Card.Content>
           <List.Item
             title="Mód"
-            description={ELO_API ? 'Élő (n8n szerver)' : 'Mock (minta adatok, EXPO_PUBLIC_MOCK=1)'}
+            description={ELO_API ? 'Élő (VeSpendo szerver)' : 'Mock (minta adatok, EXPO_PUBLIC_MOCK=1)'}
           />
-          {ELO_API && <List.Item title="Cím" description={N8N_BASE_URL} />}
+          {ELO_API && <List.Item title="Cím" description={API_ALAP_URL} />}
           <List.Item title="Betöltött tételek" description={`${tetelszam} db`} />
         </Card.Content>
         <Card.Actions>
           <Button onPress={betoltes} loading={toltes} disabled={toltes}>
             Frissítés
           </Button>
-          {ELO_API && <Button onPress={() => setKulcsSzukseges(true)}>Kulcs cseréje</Button>}
         </Card.Actions>
       </Card>
 
