@@ -60,3 +60,15 @@ docker run -d --name vespendo-web --network cloudoptima-net --restart unless-sto
 ```
 Az `ops/web/nginx.conf` a konfiguráció. Az nginx-proxy-managerben a (al)domainhez proxy host kell: `vespendo-web:80`, Let's Encrypt,
 Force SSL, és a Haladó beállítások között `client_max_body_size 25m;`.
+
+## Mentés és visszaállítás
+Napi mentés 03:30 UTC-kor (magyar idő szerint hajnal) (`/etc/cron.d/vespendo-mentes` → `ops/mentes.py`, napló: `/var/log/vespendo-mentes.log`). Egy mentés mappája
+(`/root/vespendo-mentesek/ÉÉÉÉHHNN-ÓÓPPMM/`, csak root olvashatja): `baserow.json.gz` (a VeSpendo táblák), `auth.db` (belépési kapu, SQLite
+online mentés), `n8n-workflows.json.gz`, `titkok.tar.gz` (env fájlok, kulcsfájlok). Megőrzés: legutóbbi 14 + a vasárnapiak 8 hétig.
+Kézi mentés: `python3 ops/mentes.py`.
+
+**Háztartás visszaállítása** (a háztartás sorait kitörölték / hibás import után): `python3 ops/visszaallitas.py <mentés mappa> <háztartás> [<cél háztartás>]`.
+A cél háztartás üres legyen; kategóriák új azonosítót kapnak, a hivatkozások igazodnak (tesztelve: tartalmilag azonos másolat).
+**Belépési kapu visszaállítása:** `docker stop vespendo-auth`, az `auth.db` másolása a `/root/vespendo-auth-data/` mappába (tulajdonos: 10001), `docker start vespendo-auth`.
+
+**Fontos:** a mentés ugyanazon a szerveren van, ezért szerverhiba ellen nem véd. Időnként másold le egy másik helyre a `/root/vespendo-mentesek` tartalmát.
