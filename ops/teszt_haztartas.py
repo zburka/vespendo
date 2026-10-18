@@ -31,7 +31,7 @@ try:
     br.haztartas_letrehozas(A, 'Anna'); br.haztartas_letrehozas(B, 'Bela')
     ad_a, ad_b = h(A, 'GET', 'adatok')[1], h(B, 'GET', 'adatok')[1]
     ids_a = {k['id'] for k in ad_a['kategoriak']}; ids_b = {k['id'] for k in ad_b['kategoriak']}
-    ellenoriz('adatok: saját kategóriák, átfedés nélkül', len(ids_a) == 16 and len(ids_b) == 16 and not ids_a & ids_b)
+    ellenoriz('adatok: saját kategóriák, átfedés nélkül', len(ids_a) == 17 and len(ids_b) == 17 and not ids_a & ids_b)
     ellenoriz('adatok: csak a saját személyek', {x['kulcs'] for x in ad_a['szemelyek']} == {'kozos', 'anna'})
     ellenoriz('adatok: a családi háztartás adata nem látszik', not any(k['nev'] == 'Zoltán' for k in ad_a['szemelyek']) and len(ad_a['szabalyok']) < 100)
     r = h(None, 'GET', 'adatok')

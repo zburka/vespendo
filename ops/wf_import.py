@@ -27,9 +27,15 @@ const szabalyok = $('Szabályok').all().flatMap(i => i.json.results || [])
   .sort((a, b) => b.minta.length - a.minta.length);
 const meglevo = $('Meglévő tranzakciók').all().flatMap(i => i.json.results || []);
 const kulcsok = new Set(meglevo.map(r => r.import_kulcs).filter(Boolean));
-const varakozo = meglevo.filter(r => r.allapot?.value === 'banki_egyeztetesre_var' && r.fizetesi_mod?.value !== 'keszpenz')
-  .map(r => ({ id: r.id, datum: r.datum, osszeg: Number(r.osszeg), mod: r.fizetesi_mod?.value, hasznalt: false }));
-
+// várakozó (nyugtáról rögzített, még nem párosított) tételek: egy nyugta több kategória-soráról egy csoportként, az összegük összege alapján
+const csoportok = new Map();
+for (const r of meglevo.filter(r => r.allapot?.value === 'banki_egyeztetesre_var' && r.fizetesi_mod?.value !== 'keszpenz')) {
+  const kulcs = r.nyugta_csoport || ('egy-' + r.id);
+  const cs = csoportok.get(kulcs) || { sorok: [], datum: r.datum, osszeg: 0, mod: r.fizetesi_mod?.value, hasznalt: false };
+  cs.sorok.push(r.id); cs.osszeg += Number(r.osszeg);
+  csoportok.set(kulcs, cs);
+}
+const varakozo = [...csoportok.values()].map(cs => ({ ...cs, osszeg: Math.round(cs.osszeg * 100) / 100 }));
 const uj = [], patch = [], ismeretlenek = [];
 const o = { uj: 0, egyeztetve: 0, szaballyal: 0, ismeretlen: 0, duplikalt: 0 };
 const szamlalo = {};
@@ -52,7 +58,7 @@ for (const t of body.tranzakciok) {
   if (kiadas) {
     const v = varakozo.find(v => !v.hasznalt && Math.abs(v.osszeg - osszeg) < 0.01 &&
       (Date.parse(t.datum) - Date.parse(v.datum)) / 864e5 >= 0 && (Date.parse(t.datum) - Date.parse(v.datum)) / 864e5 <= (v.mod === 'atutalas' ? 10 : 3));
-    if (v) { v.hasznalt = true; patch.push({ id: v.id, allapot: 'lezart', import_kulcs: kulcs }); o.egyeztetve++; continue; }
+    if (v) { v.hasznalt = true; v.sorok.forEach((id, n) => patch.push(n === 0 ? { id, allapot: 'lezart', import_kulcs: kulcs } : { id, allapot: 'lezart' })); o.egyeztetve++; continue; }
   }
 
   // forrásokon átívelő duplikáció-védelem: a PDF-ből már betöltött, azonos személyű, összegű, irányú és napú (±1) tétel
@@ -177,7 +183,7 @@ nodes = [
     http('Kategóriák', 'GET', f"={BR}{T['kategoriak']}/?user_field_names=true&size=200{HZ_SZURO}", (120, 0), creds=cred_baserow(), lapozas=True),
     http('Szabályok', 'GET', f"={BR}{T['szabalymotor']}/?user_field_names=true&size=200{HZ_SZURO}", (240, 0), creds=cred_baserow(), lapozas=True),
     http('Meglévő tranzakciók', 'GET',
-         f"={BR}{T['tranzakciok']}/?user_field_names=true&size=200{HZ_SZURO}&include=haztartas,datum,osszeg,allapot,import_kulcs,fizetesi_mod,tipus,tulajdonos", (480, 0),
+         f"={BR}{T['tranzakciok']}/?user_field_names=true&size=200{HZ_SZURO}&include=haztartas,datum,osszeg,allapot,import_kulcs,fizetesi_mod,tipus,tulajdonos,nyugta_csoport", (480, 0),
          creds=cred_baserow(), lapozas=True),
     code('Feldolgozás', FELDOLGOZAS, (720, 0), hiba_ag=True),
 ]

@@ -104,6 +104,8 @@ export interface NyugtaValasz {
     fizetesi_mod: FizetesiMod;
     allapot: Allapot;
     bontott_tetelek: { kategoria: string; osszeg: number }[];
+    /** A nyugta egy már megérkezett banki tételhez párosult (azt bontotta fel). */
+    parositva?: boolean;
   };
 }
 

@@ -115,9 +115,11 @@ export default function NyugtaScreen() {
                 </Text>
               ))}
               <Text variant="bodySmall">
-                {valasz.allapot === 'banki_egyeztetesre_var'
-                  ? 'A banki kivonat betöltésekor automatikusan párosítjuk.'
-                  : 'Készpénzes tétel, nincs mit párosítani.'}
+                {valasz.parositva
+                  ? 'A banki tételt a nyugta szerint kategóriákra bontottuk.'
+                  : valasz.allapot === 'banki_egyeztetesre_var'
+                    ? 'A banki tétel megérkezésekor automatikusan párosítjuk, és a nyugta szerint bontjuk.'
+                    : 'Készpénzes tétel, nincs mit párosítani.'}
               </Text>
             </Card.Content>
           </Card>

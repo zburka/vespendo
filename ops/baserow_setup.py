@@ -56,6 +56,7 @@ mezo(tr, 'forras', 'single_select', **valaszto('bank_import', 'nyugta_foto', 'ke
 mezo(tr, 'allapot', 'single_select', **valaszto('lezart', 'banki_egyeztetesre_var'))
 mezo(tr, 'megjegyzes', 'long_text')
 mezo(tr, 'nyugta_kep_url', 'text')
+mezo(tr, 'nyugta_csoport', 'text')  # egy nyugta több kategória-sora közös azonosítója (a banki tétellel együtt párosulnak)
 mezo(tr, 'import_kulcs', 'text')  # duplikáció-védelem újraimportnál (datum|osszeg|kereskedo_nyers)
 
 sz = tabla('szabalymotor', 'minta')
@@ -111,7 +112,7 @@ def sorok(tid, items):
     return api('POST', f'/api/database/rows/table/{tid}/batch/?user_field_names=true', {'items': items})['items']
 
 KATEGORIAK = [('Élelmiszer', 'kiadas', 'cart'), ('Rezsi', 'kiadas', 'flash'), ('Szórakozás', 'kiadas', 'film'),
-              ('Ruházat', 'kiadas', 'shirt'), ('Étterem', 'kiadas', 'silverware-fork-knife'), ('Közlekedés', 'kiadas', 'car'), ('Egészség', 'kiadas', 'heart-pulse'), ('Előfizetés', 'kiadas', 'calendar-sync'), ('Banki költségek', 'kiadas', 'bank'), ('Törlesztés', 'kiadas', 'credit-card-clock'), ('Átutalás', 'kiadas', 'bank-transfer-out'), ('Gazdaság', 'kiadas', 'sprout'),
+              ('Ruházat', 'kiadas', 'shirt'), ('Étterem', 'kiadas', 'silverware-fork-knife'), ('Közlekedés', 'kiadas', 'car'), ('Egészség', 'kiadas', 'heart-pulse'), ('Előfizetés', 'kiadas', 'calendar-sync'), ('Banki költségek', 'kiadas', 'bank'), ('Háztartás', 'kiadas', 'home-variant'), ('Törlesztés', 'kiadas', 'credit-card-clock'), ('Átutalás', 'kiadas', 'bank-transfer-out'), ('Gazdaság', 'kiadas', 'sprout'),
               ('Belső átvezetés', 'atvezetes', 'swap-horizontal'),
               ('Egyéb', 'kiadas', 'ellipsis-horizontal'), ('Fizetés', 'bevetel', 'cash'), ('Egyéb bevétel', 'bevetel', 'cash-plus')]
 # név szerint feltölt (idempotens): a hiányzó kategóriákat létrehozza, a meglévőket nem bántja

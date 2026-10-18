@@ -3,7 +3,7 @@
 KATEGORIAK = [
     ("Élelmiszer", "kiadas", "cart"), ("Étterem", "kiadas", "silverware-fork-knife"), ("Rezsi", "kiadas", "flash"),
     ("Szórakozás", "kiadas", "film"), ("Ruházat", "kiadas", "shirt"), ("Közlekedés", "kiadas", "car"),
-    ("Egészség", "kiadas", "heart-pulse"), ("Előfizetés", "kiadas", "calendar-sync"), ("Banki költségek", "kiadas", "bank"),
+    ("Egészség", "kiadas", "heart-pulse"), ("Előfizetés", "kiadas", "calendar-sync"), ("Banki költségek", "kiadas", "bank"), ("Háztartás", "kiadas", "home-variant"),
     ("Törlesztés", "kiadas", "credit-card-clock"), ("Átutalás", "kiadas", "bank-transfer-out"),
     ("Gazdaság", "kiadas", "sprout"), ("Egyéb", "kiadas", "ellipsis-horizontal"),
     ("Belső átvezetés", "atvezetes", "swap-horizontal"),

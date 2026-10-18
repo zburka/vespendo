@@ -24,8 +24,11 @@ const prompt = 'Magyar pénztári nyugta. A mai dátum: ' + ma + '. Add vissza K
   '{"kereskedo": szöveg, "osszeg": a fizetendő végösszeg Ft-ban (szám), "datum": "YYYY-MM-DD" vagy null, ' +
   '"datumok": a nyugtán nyomtatott ÖSSZES dátum szövege pontosan úgy, ahogy írva van (pl. ["26/10/17", "2026.10.17."]), "fizetesi_mod": "kartya"|"keszpenz"|"atutalas", ' +
   '"bontott_tetelek": [{"kategoria": __KAT__, "osszeg": szám}]}. ' +
-  (megj ? 'A felhasználó megjegyzése a tételbontásról (ezt használd a bontáshoz, az összegek összege a végösszeg): "' + megj + '". ' : 'A bontást a nyugta tételei alapján add meg: ha nem élelmiszer jellegű tételek is vannak (elektronika, ruházat, háztartási cikk), azokat külön kategóriába sorold. ');
-return [{ json: { hz: HZ, feltolto, megj, anthropic_body: { model: 'claude-haiku-5-5', max_tokens: 500, thinking: { type: 'disabled' }, messages: [{ role: 'user', content: [
+  'Olvasd végig a nyugta MINDEN sorát, és sorold a termékeket a kategóriák egyikébe a termék jellege alapján (pl. étel, ital, élelmiszer = Élelmiszer; ruha, cipő, textil = Ruházat; ' +
+  'tisztítószer, mosogatószer, papírtermék, edény, izzó, háztartási kisgép, kerti és barkács cikk = Háztartás; drogéria és kozmetikum = Háztartás; gyógyszer, vitamin = Egészség; ha a listán nincs ilyen kategória, a legközelebbi illőt vagy az Egyéb-et használd). ' +
+  'A kedvezményeket (negatív sorokat) vond le az érintett termék kategóriájából. A bontott_tetelek összege egyezzen a végösszeggel. ' +
+  (megj ? 'A felhasználó megjegyzése a tételbontásról (ezt használd elsődlegesen, az összegek összege a végösszeg): "' + megj + '". ' : '');
+return [{ json: { hz: HZ, feltolto, megj, anthropic_body: { model: 'claude-haiku-5-5', max_tokens: 900, thinking: { type: 'disabled' }, messages: [{ role: 'user', content: [
   { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } }, { type: 'text', text: prompt }] }] } } }];
 """
 KERES = r"""
@@ -55,7 +58,6 @@ const csoport = {};
 for (const t of bontas) csoport[t.kategoria] = (csoport[t.kategoria] || 0) + t.osszeg;
 bontas = Object.entries(csoport).map(([kategoria, osszeg]) => ({ kategoria, osszeg }));
 if (!bontas.length) bontas = [{ kategoria: 'Egyéb', osszeg }];
-const fo = [...bontas].sort((x, y) => y.osszeg - x.osszeg)[0];
 const ma = new Date().toISOString().slice(0, 10);
 // Egy nyomtatott dátum lehetséges értelmezései (ÉÉÉÉ.HH.NN, NN.HH.ÉÉÉÉ; kétjegyű évnél ÉÉ.HH.NN és NN.HH.ÉÉ is)
 const jeloltek = (szoveg) => {
@@ -88,10 +90,48 @@ if (isNaN(kulonbseg) || kulonbseg > 400 || kulonbseg < -2) {
 }
 const mod = ['kartya', 'keszpenz', 'atutalas'].includes(a.fizetesi_mod) ? a.fizetesi_mod : 'kartya';
 const kereskedo = String(a.kereskedo || 'Ismeretlen').slice(0, 200);
-const megj = [e.megj, bontas.length > 1 ? bontas.map(t => t.osszeg + ' ' + t.kategoria).join(', ') : '', datumJegyzet].filter(Boolean).join(' | ');
-return [{ json: { valasz: { kereskedo, osszeg, datum, fizetesi_mod: mod, allapot: mod === 'keszpenz' ? 'lezart' : 'banki_egyeztetesre_var', bontott_tetelek: bontas },
-  sor: { haztartas: HZ, kereskedo, datum, osszeg, kategoria_id: [KAT[fo.kategoria] || EGYEB], tipus: 'kiadas', tulajdonos: e.feltolto, fizetesi_mod: mod,
-         forras: 'nyugta_foto', allapot: mod === 'keszpenz' ? 'lezart' : 'banki_egyeztetesre_var', megjegyzes: megj } } }];
+// a bontás összege pontosan a végösszeg legyen (a modell kerekítései, kedvezmények miatt eltérhet)
+const bontasOssz = bontas.reduce((t, x) => t + x.osszeg, 0);
+let reszek = bontas.map(t => ({ kategoria: t.kategoria, osszeg: Math.round(t.osszeg * osszeg / bontasOssz * 100) / 100 })).sort((x, y) => y.osszeg - x.osszeg);
+const elteres = Math.round((osszeg - reszek.reduce((t, x) => t + x.osszeg, 0)) * 100) / 100;
+reszek[0].osszeg = Math.round((reszek[0].osszeg + elteres) * 100) / 100;
+const csoportId = 'ny-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const megj = [e.megj, reszek.length > 1 ? `Nyugta szerinti bontás (összesen ${osszeg} Ft)` : '', datumJegyzet].filter(Boolean).join(' | ');
+const allapot = mod === 'keszpenz' ? 'lezart' : 'banki_egyeztetesre_var';
+return [{ json: { valasz: { kereskedo, osszeg, datum, fizetesi_mod: mod, allapot, bontott_tetelek: reszek },
+  csoport: csoportId,
+  sorok: reszek.map(t => ({ haztartas: HZ, kereskedo, datum, osszeg: t.osszeg, kategoria_id: [KAT[t.kategoria] || EGYEB], tipus: 'kiadas', tulajdonos: e.feltolto,
+    fizetesi_mod: mod, forras: 'nyugta_foto', allapot, megjegyzes: megj, nyugta_csoport: csoportId })) } }];
+"""
+TERV = r"""
+// ha a bankból már megérkezett a tétel (azonos összeg, a nyugta napja körül), azt bontjuk fel a nyugta szerint; különben a nyugta várakozó tételként
+// kerül be, és a későbbi banki import az összegük alapján párosítja a csoportot
+const e = $('Értelmezés').first().json;
+const v = e.valasz;
+const nap = (a, b) => (Date.parse(b) - Date.parse(a)) / 864e5;
+const jeloltek = $('Jelöltek').all().flatMap(i => i.json.results || []);
+const bank = v.fizetesi_mod === 'keszpenz' ? null : jeloltek
+  .filter(r => r.forras?.value === 'bank_import' && !r.nyugta_csoport && r.tipus?.value === 'kiadas' && r.datum && nap(v.datum, r.datum) >= -1 && nap(v.datum, r.datum) <= 7)
+  .sort((x, y) => Math.abs(nap(v.datum, x.datum)) - Math.abs(nap(v.datum, y.datum)))[0];
+const tabla = '%(tr)s';
+const lepesek = [];
+if (bank) {
+  const elso = e.sorok[0], tobbi = e.sorok.slice(1);
+  lepesek.push({ m: 'PATCH', u: `${tabla}${bank.id}/?user_field_names=true`, b: { osszeg: elso.osszeg, kategoria_id: elso.kategoria_id, nyugta_csoport: e.csoport,
+    megjegyzes: [bank.megjegyzes, elso.megjegyzes].filter(Boolean).join(' | ').slice(0, 1000) } });
+  if (tobbi.length) lepesek.push({ m: 'POST', u: `${tabla}batch/?user_field_names=true`, b: { items: tobbi.map(t => ({ ...t, datum: bank.datum, kereskedo: bank.kereskedo, forras: 'bank_import', allapot: 'lezart' })) } });
+} else {
+  lepesek.push({ m: 'POST', u: `${tabla}batch/?user_field_names=true`, b: { items: e.sorok } });
+}
+return lepesek.map(l => ({ json: { ...l, parositva: !!bank, tranzakcio_id: bank ? String(bank.id) : '' } }));
+""" % {'tr': BR + str(T['tranzakciok']) + '/'}
+VALASZ = r"""
+const e = $('Értelmezés').first().json;
+const t = $('Terv').first().json;
+let id = t.tranzakcio_id;
+if (!id) { for (const i of $('Végrehajtás').all()) if (Array.isArray(i.json.items) && i.json.items.length) { id = String(i.json.items[0].id); break; } }
+if (!id) throw new Error('A tétel rögzítése nem sikerült');
+return [{ json: { status: 'success', data: { ...e.valasz, tranzakcio_id: id, parositva: !!t.parositva } } }];
 """
 nodes = [
     webhook('Webhook', 'nyugta-feltoltes', 'POST', (0, 0)),
@@ -101,13 +141,19 @@ nodes = [
     http('Haiku nyugtaolvasás', 'POST', 'https://api.anthropic.com/v1/messages', (480, 0), body='={{ JSON.stringify($json.anthropic_body) }}',
          creds={'httpHeaderAuth': {'id': CRED[HAIKU_NEV], 'name': HAIKU_NEV}}, fejlec={'anthropic-version': '2023-06-01'}, retry=True, hiba_ag=True),
     code('Értelmezés', ERTELMEZ, (720, 0), hiba_ag=True),
-    http('Tranzakció rögzítése', 'POST', f"{BR}{T['tranzakciok']}/?user_field_names=true", (960, 0),
-         body='={{ JSON.stringify($json.sor) }}', creds=cred_baserow(), hiba_ag=True),
-    respond('Válasz', "={{ { status: 'success', data: { ...$('Értelmezés').first().json.valasz, tranzakcio_id: String($json.id) } } }}", (1200, 0)),
+    http('Jelöltek', 'GET', f"={BR}{T['tranzakciok']}/?user_field_names=true&size=200{HZ_SZURO}&filter__osszeg__equal=" + "{{ $('Értelmezés').first().json.valasz.osszeg }}",
+         (840, 0), creds=cred_baserow(), lapozas=True, hiba_ag=True),
+    code('Terv', TERV, (960, 0), hiba_ag=True),
+    node('Végrehajtás', 'n8n-nodes-base.httpRequest', 4.2, {
+        'method': '={{ $json.m }}', 'url': '={{ $json.u }}', 'authentication': 'genericCredentialType', 'genericAuthType': 'httpHeaderAuth',
+        'sendBody': True, 'specifyBody': 'json', 'jsonBody': '={{ JSON.stringify($json.b || {}) }}', 'options': {}}, (1080, 0), cred_baserow()),
+    code('Válasz összeállítása', VALASZ, (1200, 0), hiba_ag=True),
+    respond('Válasz', '={{ $json }}', (1320, 0)),
     hiba_valasz((720, 240)),
 ]
 k = {}
 for a, b in [('Webhook', 'Előkészítés'), ('Előkészítés', 'Kategóriák'), ('Kategóriák', 'Haiku kérés'), ('Haiku kérés', 'Haiku nyugtaolvasás'), ('Haiku nyugtaolvasás', 'Értelmezés'),
-             ('Értelmezés', 'Tranzakció rögzítése'), ('Tranzakció rögzítése', 'Válasz')]: osszekot(k, a, b)
-for n in ('Előkészítés', 'Kategóriák', 'Haiku kérés', 'Haiku nyugtaolvasás', 'Értelmezés', 'Tranzakció rögzítése'): osszekot(k, n, 'Hiba válasz', 1)
+             ('Értelmezés', 'Jelöltek'), ('Jelöltek', 'Terv'), ('Terv', 'Végrehajtás'), ('Végrehajtás', 'Válasz összeállítása'),
+             ('Válasz összeállítása', 'Válasz')]: osszekot(k, a, b)
+for n in ('Előkészítés', 'Kategóriák', 'Haiku kérés', 'Haiku nyugtaolvasás', 'Értelmezés', 'Jelöltek', 'Terv', 'Válasz összeállítása'): osszekot(k, n, 'Hiba válasz', 1)
 telepit('VeSpendo – Nyugta feltöltés', nodes, k)
