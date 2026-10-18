@@ -1,14 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { useTheme } from 'react-native-paper';
+import { Text, useTheme } from 'react-native-paper';
+import { View } from 'react-native';
 
 import { MuveletGomb } from '../../components/MuveletGomb';
+import { useStore } from '../../store/useStore';
 
 export default function TabLayout() {
   const theme = useTheme();
+  const demo = useStore((s) => !!s.en?.felhasznalo.demo);
 
   return (
     <>
+      {demo && (
+        <View style={{ backgroundColor: theme.colors.tertiaryContainer, paddingVertical: 4, paddingHorizontal: 12 }}>
+          <Text variant="labelSmall" style={{ textAlign: 'center', color: theme.colors.onTertiaryContainer }}>
+            Demó mód: kitalált adatok, a bemutató éjszakánként visszaáll
+          </Text>
+        </View>
+      )}
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: theme.colors.primary,

@@ -14,6 +14,7 @@ export default function BelepesScreen() {
   const inditas = useStore((s) => s.munkamenetInditas);
   const belepes = useStore((s) => s.belepes);
   const regisztracio = useStore((s) => s.regisztracio);
+  const demoBelepes = useStore((s) => s.demoBelepes);
 
   const [mod, setMod] = useState<Mod>('belepes');
   const [email, setEmail] = useState('');
@@ -59,6 +60,17 @@ export default function BelepesScreen() {
         });
     } catch (e) {
       setHiba(e instanceof Error ? e.message : 'A művelet nem sikerült.');
+    }
+    setFolyamatban(false);
+  };
+
+  const demo = async () => {
+    setHiba('');
+    setFolyamatban(true);
+    try {
+      await demoBelepes();
+    } catch (e) {
+      setHiba(e instanceof Error ? e.message : 'A demó nem érhető el.');
     }
     setFolyamatban(false);
   };
@@ -149,6 +161,11 @@ export default function BelepesScreen() {
         <Button mode="contained" onPress={kuld} loading={folyamatban} disabled={folyamatban || !kesz}>
           {mod === 'belepes' ? 'Belépés' : 'Regisztráció'}
         </Button>
+        {mod === 'belepes' && (
+          <Button mode="outlined" icon="presentation" onPress={demo} disabled={folyamatban}>
+            Demó megtekintése (felhasználó nélkül)
+          </Button>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

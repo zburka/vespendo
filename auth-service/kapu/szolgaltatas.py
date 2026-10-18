@@ -110,6 +110,26 @@ class Kapu:
             tokenek = self._token_par(c, f["id"], tag["haztartas_id"], eszkoz)
         return {**tokenek, "en": self.en(f["id"])}
 
+    def demo_belepes(self, ip: str = "", eszkoz: str = "") -> dict:
+        """Jelszó nélküli belépés a bemutató fiókba (csak ha be van állítva és a fiók demó-jelölésű)."""
+        if not self.cfg.demo_email:
+            raise HibaKod("Nincs ilyen funkció.", 404)
+        with self.db.kapcsolat() as c:
+            self._korlat(c, f"demo:{ip}", 30, 3600, "Túl sok demó belépés, próbáld később.")
+            self._proba(c, f"demo:{ip}")
+            f = c.execute("select * from felhasznalok where email=? and demo=1 and aktiv=1", (b.email_rendbe(self.cfg.demo_email),)).fetchone()
+            tag = c.execute("select * from tagsagok where felhasznalo_id=?", (f["id"],)).fetchone() if f else None
+            if not f or not tag:
+                raise HibaKod("A demó nem érhető el.", 404)
+            tokenek = self._token_par(c, f["id"], tag["haztartas_id"], eszkoz)
+        return {**tokenek, "en": self.en(f["id"])}
+
+    def demo_korlat(self, ip: str) -> None:
+        """A demó háztartás írásainak korlátozása (óránként 120 / IP), hogy ne lehessen visszaélni vele."""
+        with self.db.kapcsolat() as c:
+            self._korlat(c, f"demoir:{ip}", 120, 3600, "A demóban túl sok módosítás történt, próbáld később.")
+            self._proba(c, f"demoir:{ip}")
+
     def frissites(self, frissito_token: str, eszkoz: str = "") -> dict:
         kivonat = b.hash_token(frissito_token or "")
         with self.db.kapcsolat() as c:
@@ -150,7 +170,8 @@ class Kapu:
             if not f or not tag:
                 raise HibaKod("Érvénytelen belépés.", 401)
             return {"felhasznalo_id": felh_id, "haztartas": tag["haztartas_id"], "szerep": tag["szerep"],
-                    "szemely": tag["szemely_kulcs"] or "", "bank": bool(tag["bank_engedelyezett"]), "api_token": api}
+                    "szemely": tag["szemely_kulcs"] or "", "bank": bool(tag["bank_engedelyezett"]), "api_token": api,
+                    "demo": bool(f["demo"])}
 
     # ------------------------------------------------------------ profil és háztartás
     def en(self, felh_id: int) -> dict:
@@ -163,7 +184,7 @@ class Kapu:
                 "where t.haztartas_id=? and f.aktiv=1 order by f.id", (h["id"],))]
         admin = t["szerep"] == "admin"
         return {
-            "felhasznalo": {"id": f["id"], "nev": f["nev"], "email": f["email"]},
+            "felhasznalo": {"id": f["id"], "nev": f["nev"], "email": f["email"], "demo": bool(f["demo"])},
             "haztartas": {"id": h["id"], "nev": h["nev"], "szerep": t["szerep"], "szemely_kulcs": t["szemely_kulcs"],
                           "bank_engedelyezett": bool(h["bank_engedelyezett"]), "meghivokod": h["meghivokod"] if admin else None},
             "tagok": [{"id": x["id"], "nev": x["nev"], "szerep": x["szerep"], "szemely_kulcs": x["szemely_kulcs"],

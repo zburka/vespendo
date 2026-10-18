@@ -85,14 +85,17 @@ return [{ json: { hz: HZ, uj, patch, ismeretlenek, osszegzes: o, volt_ismeretlen
 
 CHUNKOK = r"""
 const lista = $('Feldolgozás').first().json.ismeretlenek;
+// a háztartás saját kiadás-kategóriái kerülnek a besorolási utasításba (átnevezett / új kategóriák is)
+const nevek = $('Kategóriák').all().flatMap(i => i.json.results || []).filter(r => r.tipus?.value === 'kiadas').map(r => r.nev);
+const system = __SABLON__.replace('{KATEGORIAK}', nevek.join(', '));
 const out = [];
-for (let i = 0; i < lista.length; i += 25) out.push({ json: { chunk: lista.slice(i, i + 25) } });
+for (let i = 0; i < lista.length; i += 25) out.push({ json: { chunk: lista.slice(i, i + 25), system } });
 return out;
 """
 
-from prompts import BESOROLAS_SYSTEM
-HAIKU_BODY = ("={{ JSON.stringify({ model: 'claude-haiku-5-5', max_tokens: 700, thinking: { type: 'disabled' }, system: "
-  + json.dumps(BESOROLAS_SYSTEM, ensure_ascii=False) + ", "
+from prompts import BESOROLAS_SABLON
+CHUNKOK = CHUNKOK.replace('__SABLON__', json.dumps(BESOROLAS_SABLON, ensure_ascii=False))
+HAIKU_BODY = ("={{ JSON.stringify({ model: 'claude-haiku-5-5', max_tokens: 700, thinking: { type: 'disabled' }, system: $json.system, "
   "messages: [{ role: 'user', content: $json.chunk.map((c, i) => i + '|' + c.szoveg + '|' + c.osszeg).join('\\n') }] }) }}")
 
 OSSZEFESULES = r"""

@@ -146,3 +146,46 @@ def test_jelszocsere_lezarja_a_tobbi_eszkozt(kozeg):
     assert c.post("/api/auth/jelszo", json={"regi": JELSZO, "uj": "Uj-Hosszu-Jelszo-9"}, headers=fej(r)).status_code == 200
     assert c.post("/api/auth/frissites", json={"frissito_token": r.json()["frissito_token"]}).status_code == 401
     assert c.post("/api/auth/belepes", json={"email": "a@x.hu", "jelszo": "Uj-Hosszu-Jelszo-9"}).status_code == 200
+
+
+def demo_kozeg(tmp_path):
+    from kapu.proxy import Tovabbito
+    cfg = Beallitasok(db_utvonal=str(tmp_path / "d.db"), jwt_titok="x" * 40, n8n_belso_kulcs="belso", regisztracios_kod="mesterkod",
+                      demo_email="demo@x.hu")
+    n8n = HamisN8n()
+    app = alkalmazas(cfg, HamisBaserow(), Tovabbito(cfg, kliens=n8n))
+    return TestClient(app), cfg, n8n
+
+
+def test_demo_belepes_nincs_beallitva(kozeg):
+    c, _, _ = kozeg
+    assert c.post("/api/auth/demo").status_code == 404
+
+
+def test_demo_belepes_korlatozasokkal(tmp_path):
+    import sqlite3
+    c, cfg, n8n = demo_kozeg(tmp_path)
+    assert c.post("/api/auth/demo").status_code == 404  # még nincs demó fiók
+    r = c.post("/api/auth/regisztracio", json={"email": "demo@x.hu", "jelszo": JELSZO, "nev": "Demo", "regisztracios_kod": "mesterkod"})
+    assert c.post("/api/auth/demo").status_code == 404  # a fiók nincs demóként jelölve: nem lehet jelszó nélkül belépni
+    sqlite3.connect(cfg.db_utvonal).execute("update felhasznalok set demo=1").connection.commit()
+    d = c.post("/api/auth/demo")
+    assert d.status_code == 200 and d.json()["en"]["felhasznalo"]["demo"] is True
+    h = {"Authorization": "Bearer " + d.json()["access_token"]}
+    assert c.get("/api/v/adatok", headers=h).status_code == 200
+    assert c.post("/api/v/cel-mentes", content=b"{}", headers=h).status_code == 200
+    assert c.post("/api/v/nyugta-feltoltes", content=b"{}", headers=h).status_code == 403
+    assert c.post("/api/v/banki-import", content=b"{}", headers=h).status_code == 403
+    assert c.post("/api/auth/jelszo", json={"regi": JELSZO, "uj": "Masik-Hosszu-Jelszo-1"}, headers=h).status_code == 403
+    assert c.post("/api/auth/meghivokod", headers=h).status_code == 403
+    assert c.post("/api/auth/api-tokenek", json={"nev": "x"}, headers=h).status_code == 403
+
+
+def test_demo_irasi_korlat(tmp_path):
+    import sqlite3
+    c, cfg, _ = demo_kozeg(tmp_path)
+    c.post("/api/auth/regisztracio", json={"email": "demo@x.hu", "jelszo": JELSZO, "nev": "Demo", "regisztracios_kod": "mesterkod"})
+    sqlite3.connect(cfg.db_utvonal).execute("update felhasznalok set demo=1").connection.commit()
+    h = {"Authorization": "Bearer " + c.post("/api/auth/demo").json()["access_token"]}
+    kodok = [c.post("/api/v/cel-mentes", content=b"{}", headers=h).status_code for _ in range(122)]
+    assert kodok[:120] == [200] * 120 and kodok[120] == 429

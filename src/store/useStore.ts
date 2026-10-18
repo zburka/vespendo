@@ -24,6 +24,7 @@ import {
 } from '../services/api';
 import {
   belepes as authBelepes,
+  demoBelepes as authDemoBelepes,
   kilepes as authKilepes,
   NincsBelepes,
   onKilepett,
@@ -85,6 +86,8 @@ interface State {
   /** Induláskor: van-e eltárolt belépés, és érvényes-e. */
   munkamenetInditas: () => Promise<void>;
   belepes: (email: string, jelszo: string) => Promise<void>;
+  /** Jelszó nélküli belépés a bemutató háztartásba. */
+  demoBelepes: () => Promise<void>;
   regisztracio: (adatok: RegisztraciosAdat) => Promise<void>;
   kilepes: () => Promise<void>;
   setEn: (en: Profil) => void;
@@ -219,6 +222,13 @@ export const useStore = create<State>((set, get) => ({
   },
   belepes: async (email, jelszo) => {
     const en = await authBelepes(email, jelszo);
+    adatTorles();
+    get().setEn(en);
+    set({ munkamenet: 'belepve' });
+    await get().betoltes();
+  },
+  demoBelepes: async () => {
+    const en = await authDemoBelepes();
     adatTorles();
     get().setEn(en);
     set({ munkamenet: 'belepve' });

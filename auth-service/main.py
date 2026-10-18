@@ -38,6 +38,11 @@ def alkalmazas(cfg: Beallitasok | None = None, baserow=None, tovabbito=None) -> 
             raise HibaKod("API tokennel ez nem érhető el.", 403)
         return c
 
+    def nem_demo(c: dict = Depends(csak_ember)) -> dict:
+        if c["demo"]:
+            raise HibaKod("A demóban a fiók- és háztartás-beállítások nem módosíthatók.", 403)
+        return c
+
     class Reg(BaseModel):
         email: str
         jelszo: str
@@ -72,6 +77,10 @@ def alkalmazas(cfg: Beallitasok | None = None, baserow=None, tovabbito=None) -> 
     def belepes(b: Bel, r: Request):
         return kapu.belepes(b.email, b.jelszo, ip(r), r.headers.get("user-agent", ""))
 
+    @app.post("/api/auth/demo")
+    def demo(r: Request):
+        return kapu.demo_belepes(ip(r), r.headers.get("user-agent", ""))
+
     @app.post("/api/auth/frissites")
     def frissites(b: Frissit, r: Request):
         return kapu.frissites(b.frissito_token, r.headers.get("user-agent", ""))
@@ -91,20 +100,20 @@ def alkalmazas(cfg: Beallitasok | None = None, baserow=None, tovabbito=None) -> 
         return kapu.en(c["felhasznalo_id"])
 
     @app.post("/api/auth/jelszo")
-    def jelszo(b: JelszoCsere, c: dict = Depends(csak_ember)):
+    def jelszo(b: JelszoCsere, c: dict = Depends(nem_demo)):
         kapu.jelszo_csere(c["felhasznalo_id"], b.regi, b.uj)
         return {"ok": True}
 
     @app.post("/api/auth/meghivokod")
-    def meghivo(c: dict = Depends(csak_ember)):
+    def meghivo(c: dict = Depends(nem_demo)):
         return {"meghivokod": kapu.uj_meghivokod(c)}
 
     @app.post("/api/auth/tagok/{tag_id}/jelszo-visszaallitas")
-    def visszaallit(tag_id: int, c: dict = Depends(csak_ember)):
+    def visszaallit(tag_id: int, c: dict = Depends(nem_demo)):
         return {"ideiglenes_jelszo": kapu.tag_jelszo_visszaallitas(c, tag_id)}
 
     @app.delete("/api/auth/tagok/{tag_id}")
-    def eltavolit(tag_id: int, c: dict = Depends(csak_ember)):
+    def eltavolit(tag_id: int, c: dict = Depends(nem_demo)):
         kapu.tag_eltavolit(c, tag_id)
         return {"ok": True}
 
@@ -113,17 +122,19 @@ def alkalmazas(cfg: Beallitasok | None = None, baserow=None, tovabbito=None) -> 
         return kapu.api_tokenek(c["felhasznalo_id"])
 
     @app.post("/api/auth/api-tokenek")
-    def token_uj(b: TokenNev, c: dict = Depends(csak_ember)):
+    def token_uj(b: TokenNev, c: dict = Depends(nem_demo)):
         return kapu.api_token_letrehoz(c["felhasznalo_id"], b.nev)
 
     @app.delete("/api/auth/api-tokenek/{token_id}")
-    def token_torol(token_id: int, c: dict = Depends(csak_ember)):
+    def token_torol(token_id: int, c: dict = Depends(nem_demo)):
         kapu.api_token_torol(c["felhasznalo_id"], token_id)
         return {"ok": True}
 
     @app.api_route("/api/v/{nev}", methods=["GET", "POST"])
     async def vegpont(nev: str, r: Request, c: dict = Depends(ctx)):
         tov.ellenoriz(nev, r.method, c)
+        if c["demo"] and r.method == "POST":
+            kapu.demo_korlat(ip(r))
         torzs = await r.body()
         if len(torzs) > cfg.max_torzs_bajt:
             raise HibaKod("Túl nagy kérés.", 413)

@@ -31,6 +31,9 @@ VEGPONTOK: dict[str, tuple[frozenset, bool, bool]] = {
     "bank-allapot": (frozenset({"GET"}), True, False),
 }
 
+# a demó fiók nem indíthat AI-t / fájlfeldolgozást (költség), és nem érhet el banki végpontot
+DEMO_TILTOTT = {"nyugta-feltoltes", "banki-import", "banki-fajl-elemzes", "banki-fajl-gyors-import"}
+
 # a kliens ezeket soha nem állíthatja be
 TILTOTT_FEJLEC = {"x-haztartas", "x-felhasznalo", "x-szemely", "x-app-key", "authorization", "host", "cookie"}
 ATENGEDETT_FEJLEC = ("content-type", "accept")
@@ -49,6 +52,8 @@ class Tovabbito:
             raise HibaKod("A metódus nem engedélyezett.", 405)
         if v[1] and not ctx["bank"]:
             raise HibaKod("A bankösszekötés ennél a háztartásnál nincs engedélyezve.", 403)
+        if ctx.get("demo") and nev in DEMO_TILTOTT:
+            raise HibaKod("A demóban ez a funkció nem érhető el.", 403)
         if ctx["api_token"] and not v[2]:
             raise HibaKod("Az API token ehhez a művelethez nem használható.", 403)
 

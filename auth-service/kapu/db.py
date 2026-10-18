@@ -52,6 +52,9 @@ class Adatbazis:
         with self.kapcsolat() as c:
             c.execute("pragma journal_mode=wal")
             c.executescript(SEMA)
+            # meglévő adatbázis: demó fiók jelölése (a demó belépés jelszó nélküli, csak ezzel a jelzéssel működik)
+            if 'demo' not in [r[1] for r in c.execute('pragma table_info(felhasznalok)')]:
+                c.execute('alter table felhasznalok add column demo integer not null default 0')
 
     @contextmanager
     def kapcsolat(self):

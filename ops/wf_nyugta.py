@@ -23,10 +23,21 @@ const ma = new Date().toISOString().slice(0, 10);
 const prompt = 'Magyar pénztári nyugta. A mai dátum: ' + ma + '. Add vissza KIZÁRÓLAG egy JSON objektumként: ' +
   '{"kereskedo": szöveg, "osszeg": a fizetendő végösszeg Ft-ban (szám), "datum": "YYYY-MM-DD" vagy null, ' +
   '"datumok": a nyugtán nyomtatott ÖSSZES dátum szövege pontosan úgy, ahogy írva van (pl. ["26/10/17", "2026.10.17."]), "fizetesi_mod": "kartya"|"keszpenz"|"atutalas", ' +
-  '"bontott_tetelek": [{"kategoria": "Élelmiszer"|"Rezsi"|"Szórakozás"|"Ruházat"|"Közlekedés"|"Egyéb", "osszeg": szám}]}. ' +
+  '"bontott_tetelek": [{"kategoria": __KAT__, "osszeg": szám}]}. ' +
   (megj ? 'A felhasználó megjegyzése a tételbontásról (ezt használd a bontáshoz, az összegek összege a végösszeg): "' + megj + '". ' : 'A bontást a nyugta tételei alapján add meg: ha nem élelmiszer jellegű tételek is vannak (elektronika, ruházat, háztartási cikk), azokat külön kategóriába sorold. ');
 return [{ json: { hz: HZ, feltolto, megj, anthropic_body: { model: 'claude-haiku-5-5', max_tokens: 500, thinking: { type: 'disabled' }, messages: [{ role: 'user', content: [
   { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } }, { type: 'text', text: prompt }] }] } } }];
+"""
+KERES = r"""
+// a háztartás saját kiadás-kategóriái kerülnek az utasításba (átnevezett / új kategóriák is)
+const e = $('Előkészítés').first().json;
+const nevek = $('Kategóriák').all().flatMap(i => i.json.results || []).filter(r => r.tipus?.value === 'kiadas').map(r => r.nev);
+if (!nevek.length) throw new Error('A háztartásban nincs kiadás-kategória');
+const lista = nevek.map(n => JSON.stringify(n)).join('|');
+const body = JSON.parse(JSON.stringify(e.anthropic_body));
+const szoveg = body.messages[0].content[1];
+szoveg.text = szoveg.text.replace('__KAT__', lista) + ' A kategória KIZÁRÓLAG a felsoroltak egyike lehet.';
+return [{ json: { anthropic_body: body } }];
 """
 ERTELMEZ = HZ_JS + r"""
 const e = $('Előkészítés').first().json;
@@ -86,7 +97,8 @@ nodes = [
     webhook('Webhook', 'nyugta-feltoltes', 'POST', (0, 0)),
     code('Előkészítés', ELOKESZIT, (240, 0), hiba_ag=True),
     http('Kategóriák', 'GET', f"={BR}{T['kategoriak']}/?user_field_names=true&size=200{HZ_SZURO}", (360, 0), creds=cred_baserow(), lapozas=True, hiba_ag=True),
-    http('Haiku nyugtaolvasás', 'POST', 'https://api.anthropic.com/v1/messages', (480, 0), body="={{ JSON.stringify($('Előkészítés').first().json.anthropic_body) }}",
+    code('Haiku kérés', KERES, (420, 0), hiba_ag=True),
+    http('Haiku nyugtaolvasás', 'POST', 'https://api.anthropic.com/v1/messages', (480, 0), body='={{ JSON.stringify($json.anthropic_body) }}',
          creds={'httpHeaderAuth': {'id': CRED[HAIKU_NEV], 'name': HAIKU_NEV}}, fejlec={'anthropic-version': '2023-06-01'}, retry=True, hiba_ag=True),
     code('Értelmezés', ERTELMEZ, (720, 0), hiba_ag=True),
     http('Tranzakció rögzítése', 'POST', f"{BR}{T['tranzakciok']}/?user_field_names=true", (960, 0),
@@ -95,7 +107,7 @@ nodes = [
     hiba_valasz((720, 240)),
 ]
 k = {}
-for a, b in [('Webhook', 'Előkészítés'), ('Előkészítés', 'Kategóriák'), ('Kategóriák', 'Haiku nyugtaolvasás'), ('Haiku nyugtaolvasás', 'Értelmezés'),
+for a, b in [('Webhook', 'Előkészítés'), ('Előkészítés', 'Kategóriák'), ('Kategóriák', 'Haiku kérés'), ('Haiku kérés', 'Haiku nyugtaolvasás'), ('Haiku nyugtaolvasás', 'Értelmezés'),
              ('Értelmezés', 'Tranzakció rögzítése'), ('Tranzakció rögzítése', 'Válasz')]: osszekot(k, a, b)
-for n in ('Előkészítés', 'Kategóriák', 'Haiku nyugtaolvasás', 'Értelmezés', 'Tranzakció rögzítése'): osszekot(k, n, 'Hiba válasz', 1)
+for n in ('Előkészítés', 'Kategóriák', 'Haiku kérés', 'Haiku nyugtaolvasás', 'Értelmezés', 'Tranzakció rögzítése'): osszekot(k, n, 'Hiba válasz', 1)
 telepit('VeSpendo – Nyugta feltöltés', nodes, k)

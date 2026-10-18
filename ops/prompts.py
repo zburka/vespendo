@@ -3,8 +3,9 @@ KATEGORIAK = ['Élelmiszer', 'Étterem', 'Rezsi', 'Szórakozás', 'Ruházat', 'K
               'Törlesztés', 'Gazdaság', 'Egyéb']
 BEVETEL_KATEGORIAK = ['Fizetés', 'Egyéb bevétel']
 
-BESOROLAS_SYSTEM = (
-    'Magyar banki tételeket sorolsz be kategóriába a kereskedő neve alapján. Kategóriák: ' + ', '.join(KATEGORIAK) + '. '
+BESOROLAS_SABLON = (
+    'Magyar banki tételeket sorolsz be kategóriába a kereskedő neve alapján. Kategóriák: {KATEGORIAK}. A kategória KIZÁRÓLAG a felsoroltak egyike lehet, '
+    'az útmutatóban szereplő, de a listán nem lévő kategóriát ne használd; saját (egyedi) kategóriát a neve alapján értelmezd. '
     'Útmutató: Élelmiszer = élelmiszerbolt, pékség, hentes, zöldséges, piac, online bevásárlás, drogéria; '
     'Étterem = étterem, gyorsétterem, kávézó, bár, pizzéria, ételrendelés, cukrászda; '
     'Közlekedés = üzemanyag, parkolás, taxi, tömegközlekedés, autópálya; Rezsi = áram, gáz, víz, internet, telefon; '
@@ -16,6 +17,7 @@ BESOROLAS_SYSTEM = (
     'Bemenet soronként: sorszám|leírás|összeg. Válaszolj KIZÁRÓLAG egy JSON objektummal, amelynek kulcsa a sorszám (szövegként), értéke a kategória neve, '
     'és MINDEN bemeneti sorszám szerepel benne, pl. {"0":"Élelmiszer","1":"Egyéb"}.'
 )
+BESOROLAS_SYSTEM = BESOROLAS_SABLON.replace('{KATEGORIAK}', ', '.join(KATEGORIAK))
 
 
 BEVETEL_SYSTEM = (

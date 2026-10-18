@@ -15,7 +15,7 @@ export interface Tag {
 }
 
 export interface Profil {
-  felhasznalo: { id: number; nev: string; email: string };
+  felhasznalo: { id: number; nev: string; email: string; demo?: boolean };
   haztartas: {
     id: string;
     nev: string;
@@ -147,6 +147,12 @@ async function belepesValasz(status: number, adat: TokenValasz & { hiba?: string
 
 export async function belepes(email: string, jelszo: string): Promise<Profil> {
   const { status, adat } = await nyers<TokenValasz>('POST', '/api/auth/belepes', { email, jelszo });
+  return belepesValasz(status, adat);
+}
+
+/** Jelszó nélküli belépés a bemutató (demó) háztartásba; csak ha a szerver be van állítva rá. */
+export async function demoBelepes(): Promise<Profil> {
+  const { status, adat } = await nyers<TokenValasz>('POST', '/api/auth/demo');
   return belepesValasz(status, adat);
 }
 
