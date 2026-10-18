@@ -29,7 +29,15 @@ const elofizetesek = sorok('Előfizetések').map(r => {
            kategoria_id: String(katId(r.kategoria_id) ?? ''), kifizetve: !!nev && kiadasok.some(t => t.kereskedo.toLowerCase().includes(nev)) };
 });
 const cel = sorok('Célok').map(r => ({ nev: r.cel_neve, cel: Number(r.celosszeg) || 0, jelenleg: Number(r.aktualis_osszeg) || 0 }));
-const adat = { honap, bevetel: Math.round(osszes_bevetel), kiadas: Math.round(osszes_kiadas), egyenleg: Math.round(osszes_bevetel - osszes_kiadas), legnagyobb_kiadasok: top,
+// hol tart a hónap: a folyamatban lévő hónapról az elemzés nem írhat úgy, mintha lezárult volna
+const ma = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Budapest' });
+const [ev, ho] = honap.split('-').map(Number);
+const napokOssz = new Date(ev, ho, 0).getDate();
+const folyamatban = honap === ma.slice(0, 7);
+const honap_allapot = folyamatban
+  ? { allapot: 'folyamatban', mai_datum: ma, eltelt_napok: Number(ma.slice(8, 10)), osszes_nap: napokOssz, hatralevo_napok: napokOssz - Number(ma.slice(8, 10)) }
+  : { allapot: honap > ma.slice(0, 7) ? 'jovobeli' : 'lezart', osszes_nap: napokOssz };
+const adat = { honap, honap_allapot, bevetel: Math.round(osszes_bevetel), kiadas: Math.round(osszes_kiadas), egyenleg: Math.round(osszes_bevetel - osszes_kiadas), legnagyobb_kiadasok: top,
   keretek: keretek.map(k => ({ kategoria: k.kategoria, keret: k.havi_keret, elkoltve: Math.round(k.elkoltve), szazalek: k.szazalek })), megtakaritasi_celok: cel };
 const lenyomat = JSON.stringify(adat);
 const statik = $getWorkflowStaticData('global');
@@ -47,10 +55,12 @@ return [{ json: {
   ai_elemzes: friss ? tarolt.t : '',
 } }];
 """
-SONNET_BODY = ("={{ JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 400, thinking: { type: 'between_tools' }, "
-  "system: 'Családi pénzügyi tanácsadó vagy. A kapott havi adatok alapján írj 3-4 mondatos, barátságos, konkrét magyar nyelvű elemzést: "
-  "mi alakult jól, mire figyeljenek (különösen a költségkeretek közelében), és adj egy gyakorlati tanácsot. Ne ismételd fel az összes számot, "
-  "ne használj felsorolást vagy címsort. Csak a szöveget add vissza.', "
+SONNET_BODY = ("={{ JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 450, thinking: { type: 'between_tools' }, "
+  "system: 'Családi pénzügyi tanácsadó vagy. A kapott havi adatok alapján írj 3-4 mondatos, barátságos, konkrét magyar nyelvű elemzést. "
+  "Az adat honap_allapot mezője megmondja, hol tart a hónap. Ha az allapot lezart: visszatekintő összegzés (mi alakult jól, mi okozott gondot) és egy tanács a következő hónapra. "
+  "Ha az allapot folyamatban: a hónap MÉG TART, ezért ne írj úgy, mintha vége lenne, és ne zárd le. Mondd meg, hol tartanak az eltelt napok alapján, "
+  "egyszerű arányosítással hogyan alakulhat a hónap vége (óvatosan: ha a kiadás néhány nagy, egyszeri tételből áll, jelezd, hogy a napi tempó félrevezető lehet, és ne ijesztgess vele), mire figyeljenek a hátralévő napokban (különösen a költségkeretekhez közeli vagy túllépett kategóriáknál), "
+  "és adj egy gyakorlati tanácsot a hátralévő időre. Ne ismételd fel az összes számot, ne használj felsorolást vagy címsort. Csak a szöveget add vissza.', "
   "messages: [{ role: 'user', content: JSON.stringify($json.ai_adat) }] }) }}")
 
 MENTES = r"""

@@ -11,8 +11,8 @@ BASEROW = ENV['BASEROW_URL']
 T = IDS['tablak']
 
 # Párhuzamos (háztartás-szűrős) kiadás: a webhook-útvonalak előtagot, a workflow-nevek utótagot kapnak.
-# Átálláskor `N8N_UT_ELOTAG=` (üresen) futtatva váltják le a régieket.
-UT_ELOTAG = os.environ.get('N8N_UT_ELOTAG', 'h-')
+# Alapból nincs előtag (éles); új, párhuzamos kiadáshoz `N8N_UT_ELOTAG=h-`.
+UT_ELOTAG = os.environ.get('N8N_UT_ELOTAG', '')
 NEV_UTOTAG = ' (háztartás)' if UT_ELOTAG else ''
 BR = BASEROW + '/api/database/rows/table/'
 
@@ -108,7 +108,9 @@ def hz_kapu(nodes, kapcsolatok, csillag=False):
 def telepit(nev, nodes, kapcsolatok, beallitasok=None, hz_csillag=False):
     nev = nev + NEV_UTOTAG
     hz_kapu(nodes, kapcsolatok, hz_csillag)
-    wf = {'name': nev, 'nodes': nodes, 'connections': kapcsolatok, 'settings': {'executionOrder': 'v1', **(beallitasok or {})}}
+    wf = {'name': nev, 'nodes': nodes, 'connections': kapcsolatok, 'settings': {
+        'executionOrder': 'v1', 'saveDataSuccessExecution': 'none', 'saveDataErrorExecution': 'all', 'saveManualExecutions': False,
+        'saveExecutionProgress': False, **(beallitasok or {})}}
     st, lista = hivas('GET', N8N + '/api/v1/workflows?limit=250', fejlec=HDR)
     meglevo = next((w for w in lista['data'] if w['name'] == nev), None)
     if meglevo:
