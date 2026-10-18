@@ -189,6 +189,24 @@ export async function tranzakcioTorles(id: string): Promise<void> {
   await keres<unknown>('tranzakcio-torles', { method: 'POST', body: { id } });
 }
 
+/** `POST /api/v/kategoria-mentes`: új kategória (id nélkül) vagy átnevezés / ikoncsere. Visszaadja az azonosítót. */
+export async function kategoriaMentes(body: {
+  id?: string;
+  nev: string;
+  tipus?: 'kiadas' | 'bevetel';
+  ikon?: string;
+}): Promise<string | null> {
+  if (!ELO_API) return null;
+  const valasz = await keres<{ id?: string }>('kategoria-mentes', { method: 'POST', body });
+  return valasz.id ?? null;
+}
+
+/** `POST /api/v/kategoria-torles`: a kategória törlése; a tételek, szabályok, előfizetések a cél kategóriába kerülnek, a keret törlődik. */
+export async function kategoriaTorles(id: string, athelyezId: string): Promise<void> {
+  if (!ELO_API) return;
+  await keres<unknown>('kategoria-torles', { method: 'POST', body: { id, athelyez_id: athelyezId } });
+}
+
 /** `POST /api/v/szemely-mentes`: új személy (kulcs nélkül) vagy átnevezés / kikapcsolás. Visszaadja a kulcsot. */
 export async function szemelyMentes(body: {
   kulcs?: string;

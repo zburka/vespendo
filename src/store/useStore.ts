@@ -12,6 +12,8 @@ import {
 import {
   alapadatok,
   celMentes,
+  kategoriaMentes,
+  kategoriaTorles,
   celTorles,
   ELO_API,
   elofizetesMentes,
@@ -66,6 +68,10 @@ interface State {
   /** Dashboardról kategóriára szűrés a tranzakciólistán (kategória azonosító). */
   kategoriaSzuro: string | null;
   setKategoriaSzuro: (id: string | null) => void;
+  /** Új kategória (id nélkül) vagy átnevezés / ikoncsere. */
+  mentKategoria: (id: string | undefined, nev: string, tipus: 'kiadas' | 'bevetel', ikon: string) => Promise<void>;
+  /** Kategória törlése: a tételek, szabályok, előfizetések az `athelyezId` kategóriába kerülnek, a keret törlődik. */
+  torolKategoria: (id: string, athelyezId: string) => Promise<void>;
   /** Új személy (kulcs nélkül) vagy átnevezés / kikapcsolás. */
   mentSzemely: (kulcs: string | undefined, nev: string, aktiv: boolean) => Promise<string | null>;
   /** Élő módban: töltés állapota és az utolsó hiba. */
@@ -144,6 +150,32 @@ export const useStore = create<State>((set, get) => ({
   szemelyek: ELO_API ? [] : SZEMELYEK,
   kategoriaSzuro: null,
   setKategoriaSzuro: (kategoriaSzuro) => set({ kategoriaSzuro }),
+  mentKategoria: async (id, nev, tipus, ikon) => {
+    if (ELO_API) {
+      await kategoriaMentes({ id, nev, ...(id ? {} : { tipus }), ikon });
+      await get().betoltes();
+      return;
+    }
+    set((s) => ({
+      kategoriak: id
+        ? s.kategoriak.map((k) => (k.id === id ? { ...k, nev, ikon } : k))
+        : [...s.kategoriak, { id: `kat${Date.now()}`, nev, tipus, ikon }],
+    }));
+  },
+  torolKategoria: async (id, athelyezId) => {
+    if (ELO_API) {
+      await kategoriaTorles(id, athelyezId);
+      await get().betoltes();
+      return;
+    }
+    set((s) => ({
+      kategoriak: s.kategoriak.filter((k) => k.id !== id),
+      tranzakciok: s.tranzakciok.map((t) => (t.kategoria_id === id ? { ...t, kategoria_id: athelyezId } : t)),
+      szabalyok: s.szabalyok.map((r) => (r.kategoria_id === id ? { ...r, kategoria_id: athelyezId } : r)),
+      elofizetesek: s.elofizetesek.map((e) => (e.kategoria_id === id ? { ...e, kategoria_id: athelyezId } : e)),
+      keretek: s.keretek.filter((k) => k.kategoria_id !== id),
+    }));
+  },
   mentSzemely: async (kulcs, nev, aktiv) => {
     if (ELO_API) {
       const uj = await szemelyMentes({ kulcs, nev, aktiv });

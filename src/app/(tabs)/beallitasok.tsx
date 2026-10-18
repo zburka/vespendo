@@ -17,6 +17,7 @@ import { ApiTokenKartya } from '../../components/ApiTokenKartya';
 import { BankKartya } from '../../components/BankKartya';
 import { FiokKartya } from '../../components/FiokKartya';
 import { HaztartasKartya } from '../../components/HaztartasKartya';
+import { KategoriaKartya } from '../../components/KategoriaKartya';
 import { SzemelyValaszto } from '../../components/SzemelyValaszto';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { API_ALAP_URL } from '../../config';
@@ -106,6 +107,8 @@ export default function BeallitasokScreen() {
 
       {ELO_API && <FiokKartya />}
       {ELO_API && <HaztartasKartya />}
+
+      <KategoriaKartya />
 
       {bankEngedelyezett && <BankKartya />}
 

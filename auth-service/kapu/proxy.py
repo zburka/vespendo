@@ -14,6 +14,8 @@ VEGPONTOK: dict[str, tuple[frozenset, bool, bool]] = {
     "banki-fajl-elemzes": (frozenset({"POST"}), False, False),
     "banki-fajl-gyors-import": (frozenset({"POST"}), False, True),
     "kategoria-modositas": (frozenset({"POST"}), False, False),
+    "kategoria-mentes": (frozenset({"POST"}), False, False),
+    "kategoria-torles": (frozenset({"POST"}), False, False),
     "tranzakcio-felvetel": (frozenset({"POST"}), False, False),
     "tranzakcio-modositas": (frozenset({"POST"}), False, False),
     "tranzakcio-torles": (frozenset({"POST"}), False, False),

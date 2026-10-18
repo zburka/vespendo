@@ -1,9 +1,9 @@
-"""Kétháztartásos izolációs teszt az éles n8n-en (h- előtagú workflow-k): két ideiglenes háztartást hoz létre,
+"""Kétháztartásos izolációs teszt az éles n8n-en (belső hívással): két ideiglenes háztartást hoz létre,
 próbál átlátni / belenyúlni a másikéba, majd mindent töröl. Használat: python3 teszt_haztartas.py"""
 import json, sys, uuid
 from pathlib import Path
 from common import ENV, hivas
-from n8nlib import UT_ELOTAG, N8N, IDS
+from n8nlib import IDS
 
 sys.path.insert(0, str(Path(__file__).parent.parent / 'auth-service'))
 from kapu.baserow import BaserowKliens
@@ -20,10 +20,7 @@ def ellenoriz(nev, ok, reszlet=''):
     print(('PASS ' if ok else 'FAIL ') + nev + ('' if ok else f'  -> {reszlet}'))
 
 
-def h(hz, metodus, ut, body=None, szemely='anna'):
-    fej = {'X-App-Key': ENV['VESPENDO_APP_KEY'], 'X-Szemely': szemely}
-    if hz: fej['X-Haztartas'] = hz
-    return hivas(metodus, f'{N8N}/webhook/{UT_ELOTAG}{ut}', body, fej)
+from belso import h
 
 
 def siker(r):
@@ -86,6 +83,27 @@ try:
     ellenoriz('újraimport A-nak: duplikáció-védelem működik', ra2[1]['data']['uj'] == 0 and ra2[1]['data']['duplikalt'] == 1, ra2)
     ellenoriz('bank-állapot: az új háztartásnak nincs kapcsolata', h(A, 'GET', 'bank-allapot')[1].get('kapcsolatok') == [])
     ellenoriz('bank-összekötés idegen személyre elutasítva', not siker(h(A, 'POST', 'bank-osszekotes', {'szemely': 'bela'})))
+
+    # kategóriakezelés
+    rk = h(A, 'POST', 'kategoria-mentes', {'nev': 'Kisállat', 'tipus': 'kiadas', 'ikon': 'paw'}); uj_kat = rk[1].get('id')
+    ellenoriz('új kategória létrehozása', siker(rk) and uj_kat, rk)
+    ellenoriz('azonos nevű kategória elutasítva (ékezet- és kisbetű-független)', not siker(h(A, 'POST', 'kategoria-mentes', {'nev': 'kisallat', 'tipus': 'kiadas'})))
+    ellenoriz('B háztartásban ugyanaz a név szabad', siker(h(B, 'POST', 'kategoria-mentes', {'nev': 'Kisállat', 'tipus': 'kiadas'})))
+    ellenoriz('idegen kategória átnevezése elutasítva', not siker(h(B, 'POST', 'kategoria-mentes', {'id': kat_a, 'nev': 'HACK'})))
+    ellenoriz('kategória átnevezése', siker(h(A, 'POST', 'kategoria-mentes', {'id': uj_kat, 'nev': 'Háziállat'})) and any(x['nev'] == 'Háziállat' for x in h(A, 'GET', 'adatok')[1]['kategoriak']))
+    ellenoriz('érvénytelen ikon elutasítva', not siker(h(A, 'POST', 'kategoria-mentes', {'id': uj_kat, 'nev': 'Háziállat', 'ikon': '../x'})))
+    h(A, 'POST', 'tranzakcio-felvetel', {'kereskedo': 'Állatorvos', 'osszeg': 9000, 'datum': '2026-10-02', 'kategoria_id': uj_kat})
+    h(A, 'POST', 'keret-mentes', {'kategoria_id': uj_kat, 'nev': 'x', 'havi_keret': 10000})
+    bev_a = next(x['id'] for x in h(A, 'GET', 'adatok')[1]['kategoriak'] if x['tipus'] == 'bevetel')
+    egyeb_a = next(x['id'] for x in h(A, 'GET', 'adatok')[1]['kategoriak'] if x['nev'] == 'Egyéb')
+    ellenoriz('törlés idegen háztartásból elutasítva', not siker(h(B, 'POST', 'kategoria-torles', {'id': uj_kat, 'athelyez_id': kat_b})))
+    ellenoriz('törlés idegen cél kategóriával elutasítva', not siker(h(A, 'POST', 'kategoria-torles', {'id': uj_kat, 'athelyez_id': kat_b})))
+    ellenoriz('törlés eltérő típusú célra elutasítva', not siker(h(A, 'POST', 'kategoria-torles', {'id': uj_kat, 'athelyez_id': bev_a})))
+    rt = h(A, 'POST', 'kategoria-torles', {'id': uj_kat, 'athelyez_id': egyeb_a})
+    ellenoriz('törlés áthelyezéssel', siker(rt) and rt[1].get('athelyezett', {}).get('tranzakcio') == 1 and rt[1]['athelyezett']['keret_torolve'] == 1, rt)
+    ad = h(A, 'GET', 'adatok')[1]
+    ellenoriz('a kategória és a kerete megszűnt', not any(x['id'] == uj_kat for x in ad['kategoriak']) and not any(x['kategoria_id'] == uj_kat for x in ad['keretek']))
+    ellenoriz('a tétel az Egyéb kategóriába került', any(t['kereskedo'] == 'Állatorvos' and t['kategoria_id'] == egyeb_a for t in h(A, 'GET', 'tranzakciok')[1]['tranzakciok']))
 finally:
     for hz in (A, B):
         br.haztartas_torles(hz)
