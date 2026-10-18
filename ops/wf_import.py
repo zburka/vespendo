@@ -1,21 +1,24 @@
 from n8nlib import *
 
-BR = BASEROW + '/api/database/rows/table/'
-KAT_ID = IDS['kategoriak']
 
 # A Haiku besorolás csak akkor épül be, ha van a VeSpendo-nak saját Anthropic hitelesítője az n8n-ben.
 HAIKU_NEV = 'VeSpendo Anthropic (x-api-key)'
 HAIKU = HAIKU_NEV in CRED
 ANTHROPIC = {'httpHeaderAuth': {'id': CRED.get(HAIKU_NEV), 'name': HAIKU_NEV}}
 
-FELDOLGOZAS = r"""
+FELDOLGOZAS = HZ_JS + r"""
 const body = $('Webhook').first().json.body || {};
 if (!Array.isArray(body.tranzakciok)) throw new Error('Hiányzó tranzakciok lista');
-if (!/^[a-z0-9_]{1,30}$/.test(String(body.feltolto || ''))) throw new Error('Érvénytelen vagy hiányzó feltoltő (a személy kulcsa kell)');
-const feltolto = body.feltolto;
+const feltolto = String(body.feltolto || SZEMELY);
+if (!/^[a-z0-9_]{1,30}$/.test(feltolto)) throw new Error('Érvénytelen vagy hiányzó feltoltő (a személy kulcsa kell)');
 // ékezet- és kisbetű-független illesztés (a bank API ékezet nélkül adja a neveket)
 const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-const EGYEB = %(egyeb)d, FIZETES = %(fizetes)d, ATUTALAS = %(atutalas)d;
+// a háztartás saját kategóriái (azonosítók háztartásonként eltérnek)
+const kats = $('Kategóriák').all().flatMap(i => i.json.results || []);
+const KATN = Object.fromEntries(kats.map(r => [r.nev, r.id]));
+const elso = (tip) => (kats.find(r => r.tipus?.value === tip) || kats[0] || {}).id;
+const EGYEB = KATN['Egyéb'] || elso('kiadas'), FIZETES = KATN['Egyéb bevétel'] || elso('bevetel'), ATUTALAS = KATN['Átutalás'] || EGYEB;
+if (!EGYEB) throw new Error('A háztartásban nincs kategória');
 const ATUTALAS_RE = /^(azonnali fizetés|napközbeni átutalás|átutalás|qvik fizetés|csoportos|beszedés)/i;
 
 const szabalyok = $('Szabályok').all().flatMap(i => i.json.results || [])
@@ -66,7 +69,7 @@ for (const t of body.tranzakciok) {
   const szoveg = norm(nyers + ' ' + koz);
   const sz = szabalyok.find(r => szoveg.includes(r.minta));
   const sor = {
-    kereskedo: (nyers || koz || 'Ismeretlen').slice(0, 200), datum: t.datum, osszeg,
+    haztartas: HZ, kereskedo: (nyers || koz || 'Ismeretlen').slice(0, 200), datum: t.datum, osszeg,
     kategoria_id: [sz?.kat || (kiadas ? (atutalas ? ATUTALAS : EGYEB) : FIZETES)], tipus: kiadas ? 'kiadas' : 'bevetel_egyszeri', tulajdonos: sz?.tul || feltolto,
     fizetesi_mod: ['kartya', 'keszpenz', 'atutalas'].includes(t.fizetesi_mod) ? t.fizetesi_mod : (/k[aá]rty/i.test(koz + ' ' + nyers) ? 'kartya' : 'atutalas'), forras: 'bank_import', allapot: 'lezart',
     megjegyzes: koz.slice(0, 1000), import_kulcs: kulcs,
@@ -77,8 +80,8 @@ for (const t of body.tranzakciok) {
 }
 o.uj = uj.length;
 o.ismeretlen = ismeretlenek.length;
-return [{ json: { uj, patch, ismeretlenek, osszegzes: o, volt_ismeretlen: ismeretlenek.length > 0 } }];
-""" % {'egyeb': KAT_ID['Egyéb'], 'fizetes': KAT_ID['Egyéb bevétel'], 'atutalas': KAT_ID['Átutalás']}
+return [{ json: { hz: HZ, uj, patch, ismeretlenek, osszegzes: o, volt_ismeretlen: ismeretlenek.length > 0 } }];
+"""
 
 CHUNKOK = r"""
 const lista = $('Feldolgozás').first().json.ismeretlenek;
@@ -95,7 +98,7 @@ HAIKU_BODY = ("={{ JSON.stringify({ model: 'claude-haiku-5-5', max_tokens: 700, 
 OSSZEFESULES = r"""
 const alap = $('Feldolgozás').first().json;
 const uj = alap.uj;
-const KAT = %(kat)s;
+const KAT = Object.fromEntries($('Kategóriák').all().flatMap(i => i.json.results || []).map(r => [r.nev, r.id]));
 const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const GEN = /^(vásárlás kártyával|áruvisszavét ellenértéke|azonnali fizetés.*|napközbeni átutalás.*|tranzakció.*)$/i;
 const kulcs = (sz) => {
@@ -109,7 +112,7 @@ const kulcs = (sz) => {
 };
 let hasznalt = 0;
 const tanult = {};
-if (alap.volt_ismeretlen && %(haiku)s) {
+if (alap.volt_ismeretlen && __HAIKU__) {
   let haiku = [];
   try { haiku = $('Haiku besorolás').all(); } catch (e) { haiku = []; }
   const chunkok = $('Chunkok').all().map(i => i.json.chunk);
@@ -136,7 +139,7 @@ if (alap.volt_ismeretlen && %(haiku)s) {
 const darabok = [];
 for (let i = 0; i < uj.length; i += 200) darabok.push(uj.slice(i, i + 200));
 return [{ json: { uj_darabok: darabok, ai_besorolt: hasznalt, tanult } }];
-""" % {'kat': json.dumps(KAT_ID, ensure_ascii=False), 'haiku': 'true' if HAIKU else 'false'}
+""".replace('__HAIKU__', 'true' if HAIKU else 'false')
 
 LETREHOZAS_ITEMEK = r"""
 const d = $('Összefésülés').first().json.uj_darabok;
@@ -150,7 +153,8 @@ return out.length ? out : [{ json: { items: [] } }];
 """
 TANULT_ITEMEK = r"""
 const t = $('Összefésülés').first().json.tanult || {};
-const items = Object.entries(t).map(([minta, kat]) => ({ minta, kategoria_id: [kat] }));
+const hz = $('Feldolgozás').first().json.hz;
+const items = Object.entries(t).map(([minta, kat]) => ({ haztartas: hz, minta, kategoria_id: [kat] }));
 return [{ json: { items } }];
 """
 VALASZ = r"""
@@ -167,9 +171,10 @@ NAGYOBB = {'type': 'number', 'operation': 'gt'}
 
 nodes = [
     webhook('Webhook', 'banki-import', 'POST', (0, 0)),
-    http('Szabályok', 'GET', f"{BR}{T['szabalymotor']}/?user_field_names=true&size=200", (240, 0), creds=cred_baserow(), lapozas=True),
+    http('Kategóriák', 'GET', f"={BR}{T['kategoriak']}/?user_field_names=true&size=200{HZ_SZURO}", (120, 0), creds=cred_baserow(), lapozas=True),
+    http('Szabályok', 'GET', f"={BR}{T['szabalymotor']}/?user_field_names=true&size=200{HZ_SZURO}", (240, 0), creds=cred_baserow(), lapozas=True),
     http('Meglévő tranzakciók', 'GET',
-         f"{BR}{T['tranzakciok']}/?user_field_names=true&size=200&include=datum,osszeg,allapot,import_kulcs,fizetesi_mod,tipus,tulajdonos", (480, 0),
+         f"={BR}{T['tranzakciok']}/?user_field_names=true&size=200{HZ_SZURO}&include=haztartas,datum,osszeg,allapot,import_kulcs,fizetesi_mod,tipus,tulajdonos", (480, 0),
          creds=cred_baserow(), lapozas=True),
     code('Feldolgozás', FELDOLGOZAS, (720, 0), hiba_ag=True),
 ]
@@ -199,7 +204,7 @@ nodes += [
     hiba_valasz((4080, 240)),
 ]
 k = {}
-osszekot(k, 'Webhook', 'Szabályok'); osszekot(k, 'Szabályok', 'Meglévő tranzakciók'); osszekot(k, 'Meglévő tranzakciók', 'Feldolgozás')
+osszekot(k, 'Webhook', 'Kategóriák'); osszekot(k, 'Kategóriák', 'Szabályok'); osszekot(k, 'Szabályok', 'Meglévő tranzakciók'); osszekot(k, 'Meglévő tranzakciók', 'Feldolgozás')
 if HAIKU:
     osszekot(k, 'Feldolgozás', 'Van ismeretlen?')
     osszekot(k, 'Van ismeretlen?', 'Chunkok', 0); osszekot(k, 'Van ismeretlen?', 'Összefésülés', 1)

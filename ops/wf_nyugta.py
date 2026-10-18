@@ -1,7 +1,5 @@
 from n8nlib import *
 
-BR = BASEROW + '/api/database/rows/table/'
-KAT_ID = IDS['kategoriak']
 HAIKU_NEV = 'VeSpendo Anthropic (x-api-key)'
 HAIKU = HAIKU_NEV in CRED
 
@@ -14,11 +12,11 @@ if not HAIKU:
     telepit('VeSpendo – Nyugta feltöltés', nodes, k)
     raise SystemExit(0)
 
-ELOKESZIT = r"""
+ELOKESZIT = HZ_JS + r"""
 const b = $('Webhook').first().json.body || {};
 const m = /^data:(image\/(?:jpeg|png|webp|gif));base64,(.+)$/s.exec(String(b.kep_base64 || ''));
 if (!m) throw new Error('Hiányzó vagy érvénytelen kep_base64');
-const feltolto = String(b.feltolto || 'ferj');
+const feltolto = String(b.feltolto || SZEMELY);
 if (!/^[a-z0-9_]{1,30}$/.test(feltolto)) throw new Error('Érvénytelen feltolto (a személy kulcsa kell)');
 const megj = String(b.megjegyzes || '').slice(0, 500);
 const ma = new Date().toISOString().slice(0, 10);
@@ -27,12 +25,15 @@ const prompt = 'Magyar pénztári nyugta. A mai dátum: ' + ma + '. Add vissza K
   '"datumok": a nyugtán nyomtatott ÖSSZES dátum szövege pontosan úgy, ahogy írva van (pl. ["26/10/17", "2026.10.17."]), "fizetesi_mod": "kartya"|"keszpenz"|"atutalas", ' +
   '"bontott_tetelek": [{"kategoria": "Élelmiszer"|"Rezsi"|"Szórakozás"|"Ruházat"|"Közlekedés"|"Egyéb", "osszeg": szám}]}. ' +
   (megj ? 'A felhasználó megjegyzése a tételbontásról (ezt használd a bontáshoz, az összegek összege a végösszeg): "' + megj + '". ' : 'A bontást a nyugta tételei alapján add meg: ha nem élelmiszer jellegű tételek is vannak (elektronika, ruházat, háztartási cikk), azokat külön kategóriába sorold. ');
-return [{ json: { feltolto, megj, anthropic_body: { model: 'claude-haiku-5-5', max_tokens: 500, thinking: { type: 'disabled' }, messages: [{ role: 'user', content: [
+return [{ json: { hz: HZ, feltolto, megj, anthropic_body: { model: 'claude-haiku-5-5', max_tokens: 500, thinking: { type: 'disabled' }, messages: [{ role: 'user', content: [
   { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } }, { type: 'text', text: prompt }] }] } } }];
 """
-ERTELMEZ = r"""
+ERTELMEZ = HZ_JS + r"""
 const e = $('Előkészítés').first().json;
-const KAT = %(kat)s;
+const kats = $('Kategóriák').all().flatMap(i => i.json.results || []);
+const KAT = Object.fromEntries(kats.map(r => [r.nev, r.id]));
+const EGYEB = KAT['Egyéb'] || (kats.find(r => r.tipus?.value === 'kiadas') || kats[0] || {}).id;
+if (!EGYEB) throw new Error('A háztartásban nincs kategória');
 let a;
 try { a = JSON.parse(((($input.first().json.content || []).find(b => b.type === 'text'))?.text || '').replace(/```json|```/g, '').trim()); } catch (x) { throw new Error('A nyugta nem olvasható'); }
 const osszeg = Number(a.osszeg);
@@ -78,13 +79,14 @@ const mod = ['kartya', 'keszpenz', 'atutalas'].includes(a.fizetesi_mod) ? a.fize
 const kereskedo = String(a.kereskedo || 'Ismeretlen').slice(0, 200);
 const megj = [e.megj, bontas.length > 1 ? bontas.map(t => t.osszeg + ' ' + t.kategoria).join(', ') : '', datumJegyzet].filter(Boolean).join(' | ');
 return [{ json: { valasz: { kereskedo, osszeg, datum, fizetesi_mod: mod, allapot: mod === 'keszpenz' ? 'lezart' : 'banki_egyeztetesre_var', bontott_tetelek: bontas },
-  sor: { kereskedo, datum, osszeg, kategoria_id: [KAT[fo.kategoria]], tipus: 'kiadas', tulajdonos: e.feltolto, fizetesi_mod: mod,
+  sor: { haztartas: HZ, kereskedo, datum, osszeg, kategoria_id: [KAT[fo.kategoria] || EGYEB], tipus: 'kiadas', tulajdonos: e.feltolto, fizetesi_mod: mod,
          forras: 'nyugta_foto', allapot: mod === 'keszpenz' ? 'lezart' : 'banki_egyeztetesre_var', megjegyzes: megj } } }];
-""" % {'kat': json.dumps(KAT_ID, ensure_ascii=False)}
+"""
 nodes = [
     webhook('Webhook', 'nyugta-feltoltes', 'POST', (0, 0)),
     code('Előkészítés', ELOKESZIT, (240, 0), hiba_ag=True),
-    http('Haiku nyugtaolvasás', 'POST', 'https://api.anthropic.com/v1/messages', (480, 0), body='={{ JSON.stringify($json.anthropic_body) }}',
+    http('Kategóriák', 'GET', f"={BR}{T['kategoriak']}/?user_field_names=true&size=200{HZ_SZURO}", (360, 0), creds=cred_baserow(), lapozas=True, hiba_ag=True),
+    http('Haiku nyugtaolvasás', 'POST', 'https://api.anthropic.com/v1/messages', (480, 0), body="={{ JSON.stringify($('Előkészítés').first().json.anthropic_body) }}",
          creds={'httpHeaderAuth': {'id': CRED[HAIKU_NEV], 'name': HAIKU_NEV}}, fejlec={'anthropic-version': '2023-06-01'}, retry=True, hiba_ag=True),
     code('Értelmezés', ERTELMEZ, (720, 0), hiba_ag=True),
     http('Tranzakció rögzítése', 'POST', f"{BR}{T['tranzakciok']}/?user_field_names=true", (960, 0),
@@ -93,7 +95,7 @@ nodes = [
     hiba_valasz((720, 240)),
 ]
 k = {}
-for a, b in [('Webhook', 'Előkészítés'), ('Előkészítés', 'Haiku nyugtaolvasás'), ('Haiku nyugtaolvasás', 'Értelmezés'),
+for a, b in [('Webhook', 'Előkészítés'), ('Előkészítés', 'Kategóriák'), ('Kategóriák', 'Haiku nyugtaolvasás'), ('Haiku nyugtaolvasás', 'Értelmezés'),
              ('Értelmezés', 'Tranzakció rögzítése'), ('Tranzakció rögzítése', 'Válasz')]: osszekot(k, a, b)
-for n in ('Előkészítés', 'Haiku nyugtaolvasás', 'Értelmezés', 'Tranzakció rögzítése'): osszekot(k, n, 'Hiba válasz', 1)
+for n in ('Előkészítés', 'Kategóriák', 'Haiku nyugtaolvasás', 'Értelmezés', 'Tranzakció rögzítése'): osszekot(k, n, 'Hiba válasz', 1)
 telepit('VeSpendo – Nyugta feltöltés', nodes, k)

@@ -1,5 +1,6 @@
 """n8n workflow-k generálása és telepítése az n8n public API-n keresztül."""
 import json
+import os
 from common import AKTUALIS, ENV, hivas
 
 N8N = ENV['N8N_URL']
@@ -8,6 +9,22 @@ CRED = json.load(open(AKTUALIS / 'n8n_cred.json'))
 IDS = json.load(open(AKTUALIS / 'ids.json'))
 BASEROW = ENV['BASEROW_URL']
 T = IDS['tablak']
+
+# Párhuzamos (háztartás-szűrős) kiadás: a webhook-útvonalak előtagot, a workflow-nevek utótagot kapnak.
+# Átálláskor `N8N_UT_ELOTAG=` (üresen) futtatva váltják le a régieket.
+UT_ELOTAG = os.environ.get('N8N_UT_ELOTAG', 'h-')
+NEV_UTOTAG = ' (háztartás)' if UT_ELOTAG else ''
+BR = BASEROW + '/api/database/rows/table/'
+
+# A kapu (auth-service) állítja be az X-Haztartas / X-Szemely fejlécet; az n8n csak ezt hiszi el (a webhookot az app-kulcs védi).
+HZ_KIF = ("(() => { const h = String((($('Webhook').first().json.headers) || {})['x-haztartas'] || ''); "
+          "if (!/^hz_[a-z0-9]{3,40}$/.test(h)) throw new Error('Hiányzó háztartás'); return h; })()")
+HZ_SZURO = "&filter__haztartas__equal={{ " + HZ_KIF + " }}"
+HZ_JS = ("""const _hdr = ($('Webhook').first().json.headers || {});
+const HZ = String(_hdr['x-haztartas'] || '');
+if (!/^hz_[a-z0-9]{3,40}$/.test(HZ)) throw new Error('Hiányzó háztartás');
+const SZEMELY = String(_hdr['x-szemely'] || '');
+""")
 
 def cred_baserow():
     return {'httpHeaderAuth': {'id': CRED['VeSpendo Baserow (Token)'], 'name': 'VeSpendo Baserow (Token)'}}
@@ -20,6 +37,7 @@ def node(nev, tipus, ver, params, poz, creds=None, **extra):
 
 def webhook(nev, ut, metodus, poz, nyilvanos=False):
     """Webhook az app kulcsával védve; `nyilvanos=True` csak ott, ahol kívülről (pl. a bank) hívják."""
+    ut = UT_ELOTAG + ut
     if nyilvanos:
         return node(nev, 'n8n-nodes-base.webhook', 2, {
             'httpMethod': metodus, 'path': ut, 'authentication': 'none', 'responseMode': 'responseNode', 'options': {}}, poz,
@@ -73,7 +91,23 @@ def osszekot(kapcsolatok, a, b, kimenet=0):
     while len(m) <= kimenet: m.append([])
     m[kimenet].append({'node': b, 'type': 'main', 'index': 0})
 
-def telepit(nev, nodes, kapcsolatok, beallitasok=None):
+def hz_kapu(nodes, kapcsolatok, csillag=False):
+    """Közvetlenül a védett webhook után fail-closed háztartás-ellenőrzés (hiányzó/hamis fejlécnél a workflow hibával leáll).
+    Szükséges, mert a Baserow az üres szűrőt figyelmen kívül hagyja, így hiányzó háztartásnál minden sort visszaadna."""
+    w = next((n for n in nodes if n['name'] == 'Webhook' and n['type'] == 'n8n-nodes-base.webhook'), None)
+    if not w or w['parameters'].get('authentication') == 'none':
+        return
+    minta = r"/^(hz_[a-z0-9]{3,40}" + (r"|\*" if csillag else "") + r")$/"
+    nodes.append(code('Háztartás ellenőrzés', (
+        "const h = String((($('Webhook').first().json.headers) || {})['x-haztartas'] || '');\n"
+        f"if (!{minta}.test(h)) throw new Error('Hiányzó vagy érvénytelen háztartás');\n"
+        "return $input.all();"), (w['position'][0] + 120, w['position'][1] + 80)))
+    kapcsolatok['Háztartás ellenőrzés'] = kapcsolatok.get('Webhook', {'main': [[]]})
+    kapcsolatok['Webhook'] = {'main': [[{'node': 'Háztartás ellenőrzés', 'type': 'main', 'index': 0}]]}
+
+def telepit(nev, nodes, kapcsolatok, beallitasok=None, hz_csillag=False):
+    nev = nev + NEV_UTOTAG
+    hz_kapu(nodes, kapcsolatok, hz_csillag)
     wf = {'name': nev, 'nodes': nodes, 'connections': kapcsolatok, 'settings': {'executionOrder': 'v1', **(beallitasok or {})}}
     st, lista = hivas('GET', N8N + '/api/v1/workflows?limit=250', fejlec=HDR)
     meglevo = next((w for w in lista['data'] if w['name'] == nev), None)
@@ -91,7 +125,7 @@ def telepit(nev, nodes, kapcsolatok, beallitasok=None):
     return wid
 
 def webhook_url(ut):
-    return f"{N8N}/webhook/{ut}"
+    return f"{N8N}/webhook/{UT_ELOTAG}{ut}"
 
 def app_hivas(metodus, ut, body=None):
     return hivas(metodus, webhook_url(ut), body, {'X-App-Key': ENV['VESPENDO_APP_KEY']})
@@ -100,3 +134,13 @@ def app_hivas(metodus, ut, body=None):
 def hiba_valasz(poz, nev='Hiba válasz'):
     """400-as, érthető hibaüzenet a hívónak (a hibaágból)."""
     return respond(nev, "={{ { status: 'error', uzenet: String($json.error?.message || $json.error || 'Hiba történt').replace(/\\s*\\[line \\d+\\]\\s*$/, '') } }}", poz, kod='400')
+
+
+def tulajdon_ellenorzes(nev, tabla, id_kif, poz, elozo='Előkészítés'):
+    """Id alapú írás előtt: lekéri a sort, és hibát dob, ha nem a hívó háztartásáé. Kimenet: az `elozo` node adata változatlanul.
+    Visszaad: (lekérő node, ellenőrző node) – a hibaág az ellenőrzőn van."""
+    g = http(nev + ' lekérés', 'GET', f"={BR}{T[tabla]}/{{{{ {id_kif} }}}}/?user_field_names=true", poz, creds=cred_baserow(), never_error=True)
+    c = code(nev + ' ellenőrzés', HZ_JS + """const r = $input.first().json;
+if (!r || r.haztartas !== HZ || !r.id) throw new Error('Nincs ilyen elem');
+return [{ json: $('ELOZO').first().json }];""".replace('ELOZO', elozo), (poz[0] + 130, poz[1]), hiba_ag=True)
+    return g, c

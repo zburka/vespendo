@@ -1,8 +1,7 @@
 from n8nlib import *
 
-BR = BASEROW + '/api/database/rows/table/'
 def lista(nev, tabla, poz, kiegeszites=''):
-    return http(nev, 'GET', f"{BR}{T[tabla]}/?user_field_names=true&size=200{kiegeszites}", poz, creds=cred_baserow(), lapozas=True)
+    return http(nev, 'GET', f"={BR}{T[tabla]}/?user_field_names=true&size=200{HZ_SZURO}{kiegeszites}", poz, creds=cred_baserow(), lapozas=True)
 
 # ---------- GET /webhook/adatok : kategóriák, keretek, előfizetések, célok, szabályok
 ADATOK = r"""
@@ -44,7 +43,7 @@ return [{ json: { tranzakciok: sorok.map(r => ({
   allapot: r.allapot?.value, megjegyzes: r.megjegyzes || undefined, nyugta_kep_url: r.nyugta_kep_url || undefined,
 })) } }];
 """
-url = (f"{BR}{T['tranzakciok']}/?user_field_names=true&size=200"
+url = (f"{BR}{T['tranzakciok']}/?user_field_names=true&size=200{HZ_SZURO}"
        "{{ /^\\d{4}-\\d{2}$/.test($json.query.honap || '') ? '&filter__datum__contains=' + $json.query.honap : '' }}")
 nodes = [
     webhook('Webhook', 'tranzakciok', 'GET', (0, 0)),

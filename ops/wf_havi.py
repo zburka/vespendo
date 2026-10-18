@@ -1,9 +1,8 @@
 from n8nlib import *
 
-BR = BASEROW + '/api/database/rows/table/'
 HONAP = "{{ /^\\d{4}-\\d{2}$/.test($('Webhook').first().json.query.honap || '') ? $('Webhook').first().json.query.honap : $now.format('yyyy-MM') }}"
 
-SZAMOL = r"""
+SZAMOL = HZ_JS + r"""
 const honap = (/^\d{4}-\d{2}$/.test($('Webhook').first().json.query.honap || '')) ? $('Webhook').first().json.query.honap : new Date().toISOString().slice(0, 7);
 const sorok = (nev) => $(nev).all().flatMap(i => i.json.results || []);
 const katId = (v) => (v && v[0]) ? v[0].id : null;
@@ -35,13 +34,14 @@ const adat = { honap, bevetel: Math.round(osszes_bevetel), kiadas: Math.round(os
 const lenyomat = JSON.stringify(adat);
 const statik = $getWorkflowStaticData('global');
 statik.ai = statik.ai || {};
-const tarolt = statik.ai[honap];
+const aikulcs = HZ + '|' + honap;
+const tarolt = statik.ai[aikulcs];
 const friss = !!tarolt && tarolt.l === lenyomat;
 return [{ json: {
-  kell_ai: tr.length > 0 && !friss, lenyomat, ai_adat: adat, honap,
+  kell_ai: tr.length > 0 && !friss, lenyomat, ai_adat: adat, honap, aikulcs,
   osszes_bevetel, osszes_kiadas, egyenleg: osszes_bevetel - osszes_kiadas,
   bontas_szemely_szerint: kiadasok.reduce((m, t) => { m[t.tul] = (m[t.tul] || 0) + t.osszeg; return m; }, {}),
-  bontas_tulajdonos_szerint: { kozos: sum(kiadasok.filter(t => t.tul === 'kozos')), ferj_sajat: sum(kiadasok.filter(t => t.tul === 'ferj')), feleseg_sajat: sum(kiadasok.filter(t => t.tul === 'feleseg')) },
+  bontas_tulajdonos_szerint: { kozos: sum(kiadasok.filter(t => t.tul === 'kozos')), ferj_sajat: 0, feleseg_sajat: 0 },
   keretek, elofizetesek,
   varhato_hatralevo_elofizetesek: elofizetesek.filter(e => !e.kifizetve).reduce((s, e) => s + e.varhato_osszeg, 0),
   ai_elemzes: friss ? tarolt.t : '',
@@ -57,15 +57,15 @@ MENTES = r"""
 const e = $('Számítás').first().json;
 const szoveg = (($input.first().json.content || []).find(b => b.type === 'text') || {}).text;
 const ai = (szoveg || '').trim();
-if (ai) { const statik = $getWorkflowStaticData('global'); statik.ai = statik.ai || {}; statik.ai[e.honap] = { l: e.lenyomat, t: ai }; }
+if (ai) { const statik = $getWorkflowStaticData('global'); statik.ai = statik.ai || {}; statik.ai[e.aikulcs] = { l: e.lenyomat, t: ai }; }
 return [{ json: { ...e, ai_elemzes: ai || e.ai_elemzes } }];
 """
 def lista(nev, tabla, poz, plusz=''):
-    return http(nev, 'GET', f"{BR}{T[tabla]}/?user_field_names=true&size=200{plusz}", poz, creds=cred_baserow(), lapozas=True)
+    return http(nev, 'GET', f"={BR}{T[tabla]}/?user_field_names=true&size=200{HZ_SZURO}{plusz}", poz, creds=cred_baserow(), lapozas=True)
 
 nodes = [
     webhook('Webhook', 'havi-osszesito', 'GET', (0, 0)),
-    http('Tranzakciók', 'GET', f"={BR}{T['tranzakciok']}/?user_field_names=true&size=200&filter__datum__contains=" + HONAP, (260, 0),
+    http('Tranzakciók', 'GET', f"={BR}{T['tranzakciok']}/?user_field_names=true&size=200{HZ_SZURO}&filter__datum__contains=" + HONAP, (260, 0),
          creds=cred_baserow(), lapozas=True),
     lista('Keretek', 'koltsegkeretek', (520, 0)),
     lista('Előfizetések', 'elofizetesek', (780, 0)),
@@ -77,7 +77,7 @@ nodes = [
          creds={'httpHeaderAuth': {'id': CRED['VeSpendo Anthropic (x-api-key)'], 'name': 'VeSpendo Anthropic (x-api-key)'}},
          fejlec={'anthropic-version': '2023-06-01'}, never_error=True, retry=True),
     code('Mentés', MENTES, (2280, -120)),
-    respond('Válasz', "={{ (() => { const { kell_ai, lenyomat, ai_adat, honap, ...x } = $json; return x; })() }}", (2520, 0)),
+    respond('Válasz', "={{ (() => { const { kell_ai, lenyomat, ai_adat, honap, aikulcs, ...x } = $json; return x; })() }}", (2520, 0)),
 ]
 k = {}
 lanc = ['Webhook', 'Tranzakciók', 'Keretek', 'Előfizetések', 'Kategóriák', 'Célok', 'Számítás', 'Kell AI elemzés?']

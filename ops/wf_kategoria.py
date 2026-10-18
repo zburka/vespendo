@@ -1,7 +1,6 @@
 from n8nlib import *
 
-BR = BASEROW + '/api/database/rows/table/'
-ELOKESZIT = r"""
+ELOKESZIT = HZ_JS + r"""
 const b = $('Webhook').first().json.body || {};
 const id = String(b.tranzakcio_id || '');
 if (!/^\d+$/.test(id)) throw new Error('Érvénytelen tranzakcio_id');
@@ -12,34 +11,41 @@ if (b.uj_kategoria_id !== undefined && b.uj_kategoria_id !== null) {
 }
 if (b.uj_tulajdonos !== undefined) { if (!/^[a-z0-9_]{1,30}$/.test(String(b.uj_tulajdonos))) throw new Error('Érvénytelen uj_tulajdonos'); javitas.tulajdonos = b.uj_tulajdonos; }
 if (!Object.keys(javitas).length) throw new Error('Nincs módosítandó mező');
-return [{ json: { id, javitas, minta: String(b.kereskedo_minta || '').toLowerCase().trim(), kategoria: javitas.kategoria_id?.[0] ?? null } }];
+return [{ json: { hz: HZ, id, javitas, minta: String(b.kereskedo_minta || '').toLowerCase().trim(), kategoria: javitas.kategoria_id?.[0] ?? null } }];
 """
 DONTES = r"""
 const e = $('Előkészítés').first().json;
 const letezo = ($input.first().json.results || [])[0];
 return [{ json: { ...e, szabaly_id: letezo?.id ?? null, kell_szabaly: !!(e.minta && e.kategoria) } }];
 """
+tr_lek, tr_ell = tulajdon_ellenorzes('Tranzakció', 'tranzakciok', '$json.id', (240, 120))
+kat_lek, kat_ell = tulajdon_ellenorzes('Kategória', 'kategoriak', '$json.kategoria', (600, 120))
 nodes = [
+    tr_lek, tr_ell, kat_lek, kat_ell,
+    if_('Van kategória?', '={{ $json.kategoria }}', '', {'type': 'string', 'operation': 'notEmpty', 'singleValue': True}, (500, 120)),
     webhook('Webhook', 'kategoria-modositas', 'POST', (0, 0)),
     code('Előkészítés', ELOKESZIT, (240, 0), hiba_ag=True),
     http('Tranzakció módosítása', 'PATCH', f"={BR}{T['tranzakciok']}/" + "{{ $json.id }}/?user_field_names=true", (480, 0),
          body='={{ JSON.stringify($json.javitas) }}', creds=cred_baserow(), hiba_ag=True),
-    http('Meglévő szabály', 'GET', f"={BR}{T['szabalymotor']}/?user_field_names=true&size=1&filter__minta__equal=" + "{{ encodeURIComponent($('Előkészítés').first().json.minta) }}", (720, 0), creds=cred_baserow()),
+    http('Meglévő szabály', 'GET', f"={BR}{T['szabalymotor']}/?user_field_names=true&size=1{HZ_SZURO}&filter__minta__equal=" + "{{ encodeURIComponent($('Előkészítés').first().json.minta) }}", (720, 0), creds=cred_baserow()),
     code('Döntés', DONTES, (960, 0)),
     if_('Kell szabály?', '={{ $json.kell_szabaly }}', '', {'type': 'boolean', 'operation': 'true', 'singleValue': True}, (1200, 0)),
     if_('Van már szabály?', '={{ $json.szabaly_id }}', '', {'type': 'string', 'operation': 'notEmpty', 'singleValue': True}, (1440, -120)),
     http('Szabály frissítése', 'PATCH', f"={BR}{T['szabalymotor']}/" + "{{ $json.szabaly_id }}/?user_field_names=true", (1680, -240),
          body='={{ JSON.stringify({ kategoria_id: [$json.kategoria] }) }}', creds=cred_baserow()),
     http('Szabály létrehozása', 'POST', f"{BR}{T['szabalymotor']}/?user_field_names=true", (1680, 0),
-         body="={{ JSON.stringify({ minta: $json.minta, kategoria_id: [$json.kategoria], }) }}", creds=cred_baserow()),
+         body="={{ JSON.stringify({ haztartas: $json.hz, minta: $json.minta, kategoria_id: [$json.kategoria] }) }}", creds=cred_baserow()),
     respond('Válasz', "={{ { status: 'success' } }}", (1920, 0)),
     hiba_valasz((480, 240)),
 ]
 k = {}
-for a, b in [('Webhook', 'Előkészítés'), ('Előkészítés', 'Tranzakció módosítása'), ('Tranzakció módosítása', 'Meglévő szabály'),
+for a, b in [('Webhook', 'Előkészítés'), ('Előkészítés', 'Tranzakció lekérés'), ('Tranzakció lekérés', 'Tranzakció ellenőrzés'),
+             ('Tranzakció ellenőrzés', 'Van kategória?'), ('Kategória lekérés', 'Kategória ellenőrzés'),
+             ('Kategória ellenőrzés', 'Tranzakció módosítása'), ('Tranzakció módosítása', 'Meglévő szabály'),
              ('Meglévő szabály', 'Döntés'), ('Döntés', 'Kell szabály?')]: osszekot(k, a, b)
 osszekot(k, 'Kell szabály?', 'Van már szabály?', 0); osszekot(k, 'Kell szabály?', 'Válasz', 1)
 osszekot(k, 'Van már szabály?', 'Szabály frissítése', 0); osszekot(k, 'Van már szabály?', 'Szabály létrehozása', 1)
 osszekot(k, 'Szabály frissítése', 'Válasz'); osszekot(k, 'Szabály létrehozása', 'Válasz')
-osszekot(k, 'Előkészítés', 'Hiba válasz', 1); osszekot(k, 'Tranzakció módosítása', 'Hiba válasz', 1)
+osszekot(k, 'Van kategória?', 'Kategória lekérés', 0); osszekot(k, 'Van kategória?', 'Tranzakció módosítása', 1)
+for n in ('Előkészítés', 'Tranzakció ellenőrzés', 'Kategória ellenőrzés', 'Tranzakció módosítása'): osszekot(k, n, 'Hiba válasz', 1)
 telepit('VeSpendo – Kategória módosítás', nodes, k)

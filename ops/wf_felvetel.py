@@ -1,8 +1,7 @@
 """POST /webhook/tranzakcio-felvetel: kézi tétel rögzítése (készpénzes kiadás, egyéb)."""
 from n8nlib import *
 
-BR = BASEROW + '/api/database/rows/table/'
-ELO = r"""
+ELO = HZ_JS + r"""
 const b = $('Webhook').first().json.body || {};
 const osszeg = Number(b.osszeg);
 if (!isFinite(osszeg) || osszeg <= 0) throw new Error('Az összeg legyen pozitív szám');
@@ -14,10 +13,12 @@ if (!kereskedo) throw new Error('A megnevezés kötelező');
 const tipus = ['kiadas', 'bevetel_egyszeri', 'bevetel_rendszeres'].includes(b.tipus) ? b.tipus : 'kiadas';
 const tulajdonos = /^[a-z0-9_]{1,30}$/.test(String(b.tulajdonos || '')) ? b.tulajdonos : 'kozos';
 const mod = ['kartya', 'keszpenz', 'atutalas'].includes(b.fizetesi_mod) ? b.fizetesi_mod : 'keszpenz';
-return [{ json: { sor: { kereskedo: kereskedo.slice(0, 200), datum: b.datum, osszeg, kategoria_id: [Number(kat)], tipus, tulajdonos,
+return [{ json: { kat: Number(kat), sor: { haztartas: HZ, kereskedo: kereskedo.slice(0, 200), datum: b.datum, osszeg, kategoria_id: [Number(kat)], tipus, tulajdonos,
   fizetesi_mod: mod, forras: 'kezi', allapot: 'lezart', megjegyzes: String(b.megjegyzes || '').slice(0, 1000) } } }];
 """
+kat_lek, kat_ell = tulajdon_ellenorzes('Kategória', 'kategoriak', '$json.kat', (480, 120))
 nodes = [
+    kat_lek, kat_ell,
     webhook('Webhook', 'tranzakcio-felvetel', 'POST', (0, 0)),
     code('Előkészítés', ELO, (240, 0), hiba_ag=True),
     http('Rögzítés', 'POST', f"{BR}{T['tranzakciok']}/?user_field_names=true", (480, 0),
@@ -26,6 +27,7 @@ nodes = [
     hiba_valasz((480, 240)),
 ]
 k = {}
-osszekot(k, 'Webhook', 'Előkészítés'); osszekot(k, 'Előkészítés', 'Rögzítés'); osszekot(k, 'Rögzítés', 'Válasz')
-for n in ('Előkészítés', 'Rögzítés'): osszekot(k, n, 'Hiba válasz', 1)
+osszekot(k, 'Webhook', 'Előkészítés'); osszekot(k, 'Előkészítés', 'Kategória lekérés'); osszekot(k, 'Kategória lekérés', 'Kategória ellenőrzés')
+osszekot(k, 'Kategória ellenőrzés', 'Rögzítés'); osszekot(k, 'Rögzítés', 'Válasz')
+for n in ('Előkészítés', 'Kategória ellenőrzés', 'Rögzítés'): osszekot(k, n, 'Hiba válasz', 1)
 telepit('VeSpendo – Kézi tétel felvétele', nodes, k)

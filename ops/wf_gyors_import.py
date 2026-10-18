@@ -4,7 +4,7 @@ from n8nlib import *
 APPKULCS = {'httpHeaderAuth': {'id': CRED['VeSpendo App (X-App-Key)'], 'name': 'VeSpendo App (X-App-Key)'}}
 PARSER = {'httpHeaderAuth': {'id': CRED['VeSpendo Parser (API key)'], 'name': 'VeSpendo Parser (API key)'}}
 
-ELOKESZIT = r"""
+ELOKESZIT = HZ_JS + r"""
 // JSON ({fajl_nev, fajl_base64, feltolto}) VAGY nyers fájl a kérés törzsében (iOS Parancsok: törzs = Fájl)
 const w = $('Webhook').first();
 const b = w.json.body || {};
@@ -17,16 +17,16 @@ if (!base64 && w.binary && w.binary.data) {
   nev = nev || w.binary.data.fileName || q.nev || 'kivonat.pdf';
 }
 if (!base64) throw new Error('Hiányzik a fájl: küldd a fájlt a kérés törzsében, vagy JSON-ban fajl_base64 mezőként');
-const feltolto = String(b.feltolto || q.feltolto || 'ferj');
+const feltolto = String(b.feltolto || q.feltolto || SZEMELY);
 if (!/^[a-z0-9_]{1,30}$/.test(feltolto)) throw new Error('Érvénytelen feltolto (a személy kulcsa kell)');
-return [{ json: { fajl_nev: String(nev || 'kivonat.pdf'), fajl_base64: String(base64), feltolto } }];
+return [{ json: { fajl_nev: String(nev || 'kivonat.pdf'), fajl_base64: String(base64), feltolto, hz: HZ } }];
 """
 ATADAS = r"""
 const e = $('Előkészítés').first().json;
 const v = $input.first().json;
 if (v.statusCode !== 200 || v.body?.status !== 'success') throw new Error(v.body?.uzenet || 'A fájl elemzése nem sikerült');
 const d = v.body.data;
-return [{ json: { feltolto: e.feltolto, tranzakciok: d.tranzakciok, megbizhatosag: d.megbizhatosag, figyelmeztetesek: d.figyelmeztetesek, tetelszam: d.tranzakciok.length } }];
+return [{ json: { hz: e.hz, feltolto: e.feltolto, tranzakciok: d.tranzakciok, megbizhatosag: d.megbizhatosag, figyelmeztetesek: d.figyelmeztetesek, tetelszam: d.tranzakciok.length } }];
 """
 VALASZ = r"""
 const a = $('Átadás').first().json;
@@ -43,8 +43,9 @@ nodes = [
     http('Python elemző', 'POST', 'http://vespendo-parser:8000/parse', (480, 0),
          body='={{ JSON.stringify({ fajl_nev: $json.fajl_nev, fajl_base64: $json.fajl_base64 }) }}', creds=PARSER, teljes=True),
     code('Átadás', ATADAS, (720, 0), hiba_ag=True),
-    http('Import', 'POST', 'http://localhost:5678/webhook/banki-import', (960, 0),
-         body='={{ JSON.stringify({ feltolto: $json.feltolto, tranzakciok: $json.tranzakciok }) }}', creds=APPKULCS, never_error=True),
+    http('Import', 'POST', f'http://localhost:5678/webhook/{UT_ELOTAG}banki-import', (960, 0),
+         body='={{ JSON.stringify({ feltolto: $json.feltolto, tranzakciok: $json.tranzakciok }) }}', creds=APPKULCS, never_error=True,
+         fejlec={'X-Haztartas': '={{ $json.hz }}', 'X-Szemely': '={{ $json.feltolto }}'}),
     code('Válasz összeállítása', VALASZ, (1200, 0), hiba_ag=True),
     respond('Válasz', '={{ $json }}', (1440, 0)),
     hiba_valasz((720, 240)),

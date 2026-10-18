@@ -1,11 +1,10 @@
 """Előfizetések és tranzakciók szerkesztő végpontjai: elofizetes-mentes, elofizetes-torles, tranzakcio-modositas, tranzakcio-torles."""
 from n8nlib import *
 
-BR = BASEROW + '/api/database/rows/table/'
 VAN = {'type': 'string', 'operation': 'notEmpty', 'singleValue': True}
 
 # ---------- POST /webhook/elofizetes-mentes {id?, megnevezes, varhato_osszeg, esedekesseg_napja, kategoria_id}
-EF_ELO = r"""
+EF_ELO = HZ_JS + r"""
 const b = $('Webhook').first().json.body || {};
 const nev = String(b.megnevezes || '').trim();
 if (!nev) throw new Error('A megnevezés kötelező');
@@ -17,9 +16,12 @@ const kat = String(b.kategoria_id || '');
 if (!/^\d+$/.test(kat)) throw new Error('Érvénytelen kategória');
 const id = b.id === undefined || b.id === null ? '' : String(b.id);
 if (id && !/^\d+$/.test(id)) throw new Error('Érvénytelen id');
-return [{ json: { id, sor: { megnevezes: nev.slice(0, 100), varhato_osszeg: osszeg, esedekesseg_napja: nap, kategoria_id: [Number(kat)] } } }];
+return [{ json: { id, kat: Number(kat), sor: { haztartas: HZ, megnevezes: nev.slice(0, 100), varhato_osszeg: osszeg, esedekesseg_napja: nap, kategoria_id: [Number(kat)] } } }];
 """
+kat_lek, kat_ell = tulajdon_ellenorzes('Kategória', 'kategoriak', '$json.kat', (240, 120))
+ef_lek, ef_ell = tulajdon_ellenorzes('Előfizetés', 'elofizetesek', '$json.id', (720, -240))
 nodes = [
+    kat_lek, kat_ell, ef_lek, ef_ell,
     webhook('Webhook', 'elofizetes-mentes', 'POST', (0, 0)),
     code('Előkészítés', EF_ELO, (240, 0), hiba_ag=True),
     if_('Van id?', '={{ $json.id }}', '', VAN, (480, 0)),
@@ -31,19 +33,23 @@ nodes = [
     hiba_valasz((480, 240)),
 ]
 k = {}
-osszekot(k, 'Webhook', 'Előkészítés'); osszekot(k, 'Előkészítés', 'Van id?')
-osszekot(k, 'Van id?', 'Frissítés', 0); osszekot(k, 'Van id?', 'Létrehozás', 1)
+osszekot(k, 'Webhook', 'Előkészítés'); osszekot(k, 'Előkészítés', 'Kategória lekérés'); osszekot(k, 'Kategória lekérés', 'Kategória ellenőrzés')
+osszekot(k, 'Kategória ellenőrzés', 'Van id?')
+osszekot(k, 'Van id?', 'Előfizetés lekérés', 0); osszekot(k, 'Van id?', 'Létrehozás', 1)
+osszekot(k, 'Előfizetés lekérés', 'Előfizetés ellenőrzés'); osszekot(k, 'Előfizetés ellenőrzés', 'Frissítés')
 osszekot(k, 'Frissítés', 'Válasz'); osszekot(k, 'Létrehozás', 'Válasz')
-for n in ('Előkészítés', 'Frissítés', 'Létrehozás'): osszekot(k, n, 'Hiba válasz', 1)
+for n in ('Előkészítés', 'Kategória ellenőrzés', 'Előfizetés ellenőrzés', 'Frissítés', 'Létrehozás'): osszekot(k, n, 'Hiba válasz', 1)
 telepit('VeSpendo – Előfizetés mentés', nodes, k)
 
 def torles(nev, ut, tabla):
-    ELO = r"""
+    ELO = HZ_JS + r"""
 const id = String(($('Webhook').first().json.body || {}).id || '');
 if (!/^\d+$/.test(id)) throw new Error('Érvénytelen id');
 return [{ json: { id } }];
 """
+    lek, ell = tulajdon_ellenorzes('Elem', tabla, '$json.id', (480, 120))
     nodes = [
+        lek, ell,
         webhook('Webhook', ut, 'POST', (0, 0)),
         code('Előkészítés', ELO, (240, 0), hiba_ag=True),
         http('Törlés', 'DELETE', f"={BR}{T[tabla]}/" + "{{ $json.id }}/", (480, 0), creds=cred_baserow(), hiba_ag=True),
@@ -51,15 +57,16 @@ return [{ json: { id } }];
         hiba_valasz((480, 240)),
     ]
     k = {}
-    osszekot(k, 'Webhook', 'Előkészítés'); osszekot(k, 'Előkészítés', 'Törlés'); osszekot(k, 'Törlés', 'Válasz')
-    for n in ('Előkészítés', 'Törlés'): osszekot(k, n, 'Hiba válasz', 1)
+    osszekot(k, 'Webhook', 'Előkészítés'); osszekot(k, 'Előkészítés', 'Elem lekérés'); osszekot(k, 'Elem lekérés', 'Elem ellenőrzés')
+    osszekot(k, 'Elem ellenőrzés', 'Törlés'); osszekot(k, 'Törlés', 'Válasz')
+    for n in ('Előkészítés', 'Elem ellenőrzés', 'Törlés'): osszekot(k, n, 'Hiba válasz', 1)
     telepit(nev, nodes, k)
 
 torles('VeSpendo – Előfizetés törlés', 'elofizetes-torles', 'elofizetesek')
 torles('VeSpendo – Tranzakció törlés', 'tranzakcio-torles', 'tranzakciok')
 
 # ---------- POST /webhook/tranzakcio-modositas {id, kereskedo?, osszeg?, datum?, megjegyzes?, fizetesi_mod?}
-TR_ELO = r"""
+TR_ELO = HZ_JS + r"""
 const b = $('Webhook').first().json.body || {};
 const id = String(b.id || '');
 if (!/^\d+$/.test(id)) throw new Error('Érvénytelen id');
@@ -72,7 +79,9 @@ if (b.fizetesi_mod !== undefined) { if (!['kartya', 'keszpenz', 'atutalas'].incl
 if (!Object.keys(sor).length) throw new Error('Nincs módosítandó mező');
 return [{ json: { id, sor } }];
 """
+tr_lek, tr_ell = tulajdon_ellenorzes('Tranzakció', 'tranzakciok', '$json.id', (480, 120))
 nodes = [
+    tr_lek, tr_ell,
     webhook('Webhook', 'tranzakcio-modositas', 'POST', (0, 0)),
     code('Előkészítés', TR_ELO, (240, 0), hiba_ag=True),
     http('Módosítás', 'PATCH', f"={BR}{T['tranzakciok']}/" + "{{ $json.id }}/?user_field_names=true", (480, 0),
@@ -81,19 +90,20 @@ nodes = [
     hiba_valasz((480, 240)),
 ]
 k = {}
-osszekot(k, 'Webhook', 'Előkészítés'); osszekot(k, 'Előkészítés', 'Módosítás'); osszekot(k, 'Módosítás', 'Válasz')
-for n in ('Előkészítés', 'Módosítás'): osszekot(k, n, 'Hiba válasz', 1)
+osszekot(k, 'Webhook', 'Előkészítés'); osszekot(k, 'Előkészítés', 'Tranzakció lekérés'); osszekot(k, 'Tranzakció lekérés', 'Tranzakció ellenőrzés')
+osszekot(k, 'Tranzakció ellenőrzés', 'Módosítás'); osszekot(k, 'Módosítás', 'Válasz')
+for n in ('Előkészítés', 'Tranzakció ellenőrzés', 'Módosítás'): osszekot(k, n, 'Hiba válasz', 1)
 telepit('VeSpendo – Tranzakció módosítás', nodes, k)
 
 # ---------- POST /webhook/szemely-mentes {kulcs?, nev, aktiv?}: új személy (kulcs nélkül) vagy átnevezés/aktiválás
-SZ_ELO = r"""
+SZ_ELO = HZ_JS + r"""
 const b = $('Webhook').first().json.body || {};
 const nev = String(b.nev || '').trim();
 if (!nev) throw new Error('A név kötelező');
 const kulcs = b.kulcs === undefined || b.kulcs === null ? '' : String(b.kulcs);
 if (kulcs && !/^[a-z0-9_]{1,30}$/.test(kulcs)) throw new Error('Érvénytelen kulcs');
 if (kulcs === 'kozos' && b.aktiv === false) throw new Error('A „Közös” nem kapcsolható ki');
-return [{ json: { nev: nev.slice(0, 50), kulcs, aktiv: b.aktiv !== false } }];
+return [{ json: { hz: HZ, nev: nev.slice(0, 50), kulcs, aktiv: b.aktiv !== false } }];
 """
 SZ_DONT = r"""
 const e = $('Előkészítés').first().json;
@@ -113,13 +123,13 @@ return [{ json: { ...e, kulcs, sor_id: '' } }];
 nodes = [
     webhook('Webhook', 'szemely-mentes', 'POST', (0, 0)),
     code('Előkészítés', SZ_ELO, (240, 0), hiba_ag=True),
-    http('Személyek', 'GET', f"={BR}{T['szemelyek']}/?user_field_names=true&size=200", (480, 0), creds=cred_baserow(), hiba_ag=True, lapozas=True),
+    http('Személyek', 'GET', f"={BR}{T['szemelyek']}/?user_field_names=true&size=200{HZ_SZURO}", (480, 0), creds=cred_baserow(), hiba_ag=True, lapozas=True),
     code('Döntés', SZ_DONT, (720, 0), hiba_ag=True),
     if_('Van már?', '={{ $json.sor_id }}', '', VAN, (960, 0)),
     http('Frissítés', 'PATCH', f"={BR}{T['szemelyek']}/" + "{{ $json.sor_id }}/?user_field_names=true", (1200, -120),
          body='={{ JSON.stringify({ nev: $json.nev, aktiv: $json.aktiv }) }}', creds=cred_baserow(), hiba_ag=True),
     http('Létrehozás', 'POST', f"{BR}{T['szemelyek']}/?user_field_names=true", (1200, 120),
-         body='={{ JSON.stringify({ kulcs: $json.kulcs, nev: $json.nev, aktiv: $json.aktiv }) }}', creds=cred_baserow(), hiba_ag=True),
+         body='={{ JSON.stringify({ haztartas: $json.hz, kulcs: $json.kulcs, nev: $json.nev, aktiv: $json.aktiv }) }}', creds=cred_baserow(), hiba_ag=True),
     respond('Válasz', "={{ { status: 'success', kulcs: $('Döntés').first().json.kulcs } }}", (1440, 0)),
     hiba_valasz((480, 240)),
 ]

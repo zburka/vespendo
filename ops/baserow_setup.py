@@ -97,6 +97,10 @@ ce = tabla('megtakaritasi_celok', 'cel_neve')
 mezo(ce, 'celosszeg', 'number', **SZAM)
 mezo(ce, 'aktualis_osszeg', 'number', **SZAM)
 
+# --- többháztartásos működés: minden sor egy háztartáshoz tartozik (szöveges azonosító, pl. hz_csalad)
+for _t in (kat, tr, sz, sem, bk, kk, ef, ce):
+    mezo(_t, 'haztartas', 'text')
+
 # --- induló adatok (csak üres táblába)
 def ures(tid):
     return api('GET', f'/api/database/rows/table/{tid}/?size=1')['count'] == 0
