@@ -20,7 +20,10 @@ SZEMELY_ELL = HZ_JS + r"""
 const e = $('Előkészítés').first().json;
 const sorok = $input.all().flatMap(i => i.json.results || []);
 if (!sorok.some(r => r.kulcs === e.szemely && r.aktiv)) throw new Error('Nincs ilyen személy a háztartásban');
-return [{ json: e }];
+const sor = sorok.find(r => r.kulcs === e.szemely);
+const alk = String(sor.bank_alkalmazas || 'alap');
+if (!/^[a-z0-9_]{1,20}$/.test(alk)) throw new Error('Érvénytelen banki alkalmazás');
+return [{ json: { ...e, alkalmazas: alk } }];
 """
 VALASZ1 = r"""
 const v = $input.first().json;
@@ -32,7 +35,7 @@ nodes = [
     code('Előkészítés', ELO, (240, 0), hiba_ag=True),
     http('Személyek', 'GET', f"={BR}{T['szemelyek']}/?user_field_names=true&size=200{HZ_SZURO}", (360, 0), creds=cred_baserow(), lapozas=True, hiba_ag=True),
     code('Személy ellenőrzés', SZEMELY_ELL, (420, 0), hiba_ag=True),
-    http('Bank /auth', 'POST', f'{BANK_URL}/auth', (480, 0), body="={{ JSON.stringify({ szemely: $json.hz + '~' + $json.szemely }) }}", creds=BANK, teljes=True),
+    http('Bank /auth', 'POST', f'{BANK_URL}/auth', (480, 0), body="={{ JSON.stringify({ szemely: $json.hz + '~' + $json.szemely, alkalmazas: $json.alkalmazas }) }}", creds=BANK, teljes=True),
     code('Válasz előkészítés', VALASZ1, (720, 0), hiba_ag=True),
     respond('Válasz', '={{ $json }}', (960, 0)),
     hiba_valasz((480, 240)),
@@ -69,7 +72,7 @@ const [hz, szemely] = String(s.szemely).split('~');
 const letezo = $input.all().flatMap(i => i.json.results || []);
 const uj = [], frissit = [];
 for (const a of s.szamlak) {
-  const sor = { haztartas: hz, azonosito: `${s.session_id}:${a.uid}`.slice(0, 120), szemely, session_id: s.session_id, szamla_uid: a.uid, iban: a.iban || '', lejarat: s.valid_until || '', aktiv: true };
+  const sor = { haztartas: hz, azonosito: `${s.session_id}:${a.uid}`.slice(0, 120), szemely, alkalmazas: s.alkalmazas || 'alap', session_id: s.session_id, szamla_uid: a.uid, iban: a.iban || '', lejarat: s.valid_until || '', aktiv: true };
   const ex = letezo.find(r => r.szamla_uid === a.uid);
   if (ex) frissit.push({ id: ex.id, ...sor }); else uj.push({ ...sor, utolso_szinkron: '' });
 }
@@ -118,7 +121,7 @@ return aktiv.map(r => {
   // a bank legfeljebb 89 napnyi történetet ad vissza: 88 nap a felső határ (első szinkron és hosszú kihagyás után is)
   const legkorabbi = Date.now() - 88 * 864e5;
   const alap = new Date(Math.max(r.utolso_szinkron ? Date.parse(r.utolso_szinkron) - 7 * 864e5 : legkorabbi, legkorabbi));
-  return { json: { nincs: false, id: r.id, hz: r.haztartas, szemely: r.szemely, uid: r.szamla_uid, utolso: r.utolso_szinkron || '', date_from: alap.toISOString().slice(0, 10) } };
+  return { json: { nincs: false, id: r.id, hz: r.haztartas, alkalmazas: r.alkalmazas || 'alap', szemely: r.szemely, uid: r.szamla_uid, utolso: r.utolso_szinkron || '', date_from: alap.toISOString().slice(0, 10) } };
 });
 """
 IMPORT_ELO = r"""
@@ -142,7 +145,7 @@ nodes = [
     code('Aktív kapcsolatok', AKTIV, (480, 0)),
     if_('Nincs kapcsolat?', '={{ $json.nincs }}', '', IGAZ, (720, 0)),
     respond('Üres válasz', "={{ { status: 'success', kapcsolatok: [], megjegyzes: 'Nincs aktív banki kapcsolat.' } }}", (960, -120)),
-    http('Bank /transactions', 'GET', f"={BANK_URL}/transactions?uid=" + "{{ $json.uid }}&date_from={{ $json.date_from }}", (960, 120), creds=BANK, teljes=True),
+    http('Bank /transactions', 'GET', f"={BANK_URL}/transactions?uid=" + "{{ $json.uid }}&alkalmazas={{ $json.alkalmazas }}&date_from={{ $json.date_from }}", (960, 120), creds=BANK, teljes=True),
     code('Import előkészítés', IMPORT_ELO, (1200, 120)),
     http('Banki import', 'POST', f'http://localhost:5678/webhook/{UT_ELOTAG}banki-import', (1440, 120),
          body='={{ JSON.stringify({ feltolto: $json.szemely, tranzakciok: $json.tranzakciok }) }}', creds=APPKULCS, never_error=True,

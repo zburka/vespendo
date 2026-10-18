@@ -82,6 +82,8 @@ mezo(bk, 'iban', 'text')
 mezo(bk, 'lejarat', 'text')                  # a hozzáférés lejárata (RFC3339)
 mezo(bk, 'utolso_szinkron', 'text')          # YYYY-MM-DD
 mezo(bk, 'aktiv', 'boolean')
+mezo(bk, 'alkalmazas', 'text')               # melyik Enable Banking alkalmazáson keresztül jött létre (üres = alap)
+mezo(sem, 'bank_alkalmazas', 'text')         # a személy banki összekötése melyik alkalmazást használja (üres = alap)
 
 kk = tabla('koltsegkeretek', 'nev')
 mezo(kk, 'kategoria_id', 'link_row', link_row_table_id=kat, has_related_field=False)

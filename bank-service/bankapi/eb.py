@@ -3,9 +3,11 @@
 A privát kulcs csak ebben a konténerben él (csak olvasható csatolás), az n8n nem látja.
 """
 import base64
+import copy
 import hashlib
 import hmac
 import json
+import logging
 import os
 import re
 import time
@@ -37,6 +39,19 @@ class Konfig:
         self.redirect_url = os.environ.get("BANK_REDIRECT_URL", "https://n8n.cloudoptima.hu/webhook/bank-callback")
         self.api_kulcs = os.environ.get("BANK_API_KEY", "")
         self.api = os.environ.get("ENABLEBANKING_API", API)
+        # további Enable Banking alkalmazások (pl. másik személy saját alkalmazása): {"2": {"app_id": "...", "kulcs": "/run/secrets/...pem"}}
+        self.alkalmazasok: dict = json.loads(os.environ.get("BANK_ALKALMAZASOK", "") or "{}")
+
+    def app(self, nev: str = "alap") -> "Konfig":
+        """Az adott nevű alkalmazás beállításai (az 'alap' az alapértelmezett)."""
+        if not nev or nev == "alap":
+            return self
+        a = self.alkalmazasok.get(nev)
+        if not a:
+            raise BankHiba(f"Ismeretlen banki alkalmazás: {nev}", 400)
+        k = copy.copy(self)
+        k.app_id, k.kulcs_utvonal = a["app_id"], a["kulcs"]
+        return k
 
 
 _token_gyorsitotar: dict = {}
@@ -80,14 +95,18 @@ def _kerj(konfig: Konfig, metodus: str, ut: str, **kw):
 
 
 # --- state: állapotmentes, aláírt (nem kell tárolni, lejár)
-def state_keszit(konfig: Konfig, szemely: str, most: float | None = None) -> str:
-    adat = json.dumps({"p": szemely, "t": int(most or time.time()), "n": uuid.uuid4().hex[:12]}, separators=(",", ":"))
+def state_keszit(konfig: Konfig, szemely: str, most: float | None = None, alkalmazas: str = "alap") -> str:
+    adat = json.dumps({"p": szemely, "a": alkalmazas, "t": int(most or time.time()), "n": uuid.uuid4().hex[:12]}, separators=(",", ":"))
     b = base64.urlsafe_b64encode(adat.encode()).decode().rstrip("=")
     alair = hmac.new(konfig.api_kulcs.encode(), b.encode(), hashlib.sha256).hexdigest()[:32]
     return f"{b}.{alair}"
 
 
 def state_ellenoriz(konfig: Konfig, state: str, most: float | None = None) -> str:
+    return state_adat(konfig, state, most)["p"]
+
+
+def state_adat(konfig: Konfig, state: str, most: float | None = None) -> dict:
     try:
         b, alair = state.rsplit(".", 1)
         vart = hmac.new(konfig.api_kulcs.encode(), b.encode(), hashlib.sha256).hexdigest()[:32]
@@ -98,7 +117,8 @@ def state_ellenoriz(konfig: Konfig, state: str, most: float | None = None) -> st
         raise BankHiba("Érvénytelen állapot (state): a hivatkozás nem tőlünk származik.", 400) from e
     if (most or time.time()) - adat["t"] > STATE_ERVENYESSEG_MP:
         raise BankHiba("A jóváhagyási hivatkozás lejárt, indítsd újra az összekötést.", 400)
-    return adat["p"]
+    adat.setdefault("a", "alap")
+    return adat
 
 
 def maximalis_hozzaferes_napok(konfig: Konfig) -> int:
@@ -113,17 +133,19 @@ def maximalis_hozzaferes_napok(konfig: Konfig) -> int:
     return 90
 
 
-def auth_inditas(konfig: Konfig, szemely: str, napok: int | None = None, most: datetime | None = None) -> dict:
+def auth_inditas(konfig: Konfig, szemely: str, napok: int | None = None, most: datetime | None = None,
+                 alkalmazas: str = "alap") -> dict:
     most = most or datetime.now(timezone.utc)
+    app = konfig.app(alkalmazas)  # ismeretlen alkalmazásnál hiba, még mock módban is
     if MOCK:
-        st = state_keszit(konfig, szemely)
+        st = state_keszit(konfig, szemely, alkalmazas=alkalmazas)
         return {"url": f"{konfig.redirect_url}?code=mock&state={st}", "authorization_id": "mock", "napok": napok or 90}
-    napok = min(napok or 180, maximalis_hozzaferes_napok(konfig))
+    napok = min(napok or 180, maximalis_hozzaferes_napok(app))
     lejar = (most + timedelta(days=napok)).strftime("%Y-%m-%dT%H:%M:%S.000000+00:00")
-    valasz = _kerj(konfig, "POST", "/auth", json={
+    valasz = _kerj(app, "POST", "/auth", json={
         "access": {"valid_until": lejar},
         "aspsp": {"name": ASPSP_NEV, "country": ASPSP_ORSZAG},
-        "state": state_keszit(konfig, szemely),
+        "state": state_keszit(konfig, szemely, alkalmazas=alkalmazas),
         "redirect_url": konfig.redirect_url,
         "psu_type": "personal",
         "language": "hu",
@@ -132,18 +154,26 @@ def auth_inditas(konfig: Konfig, szemely: str, napok: int | None = None, most: d
 
 
 def session_letrehozas(konfig: Konfig, code: str, state: str) -> dict:
-    szemely = state_ellenoriz(konfig, state)
+    adat = state_adat(konfig, state)
+    szemely, alkalmazas = adat["p"], adat["a"]
+    app = konfig.app(alkalmazas)
     if MOCK:
         lejar = (datetime.now(timezone.utc) + timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%S.000000+00:00")
-        return {"szemely": szemely, "session_id": f"mock-session-{szemely}",
+        return {"szemely": szemely, "alkalmazas": alkalmazas, "session_id": f"mock-session-{szemely}",
                 "szamlak": [{"uid": f"mock-uid-{szemely}", "iban": "HU00MOCK0000", "nev": "Mock folyószámla"}], "valid_until": lejar}
-    v = _kerj(konfig, "POST", "/sessions", json={"code": code})
+    v = _kerj(app, "POST", "/sessions", json={"code": code})
+    # diagnosztika (személyes adat nélkül): milyen mezőket és hány számlát ad vissza az Enable Banking
+    logging.getLogger("uvicorn.error").info(
+        "session: mezők=%s számla=%s accounts_data=%s aspsp=%s",
+        sorted(v.keys()), len(v.get("accounts", [])), len(v.get("accounts_data", []) or []), (v.get("aspsp") or {}).get("name"),
+    )
     szamlak = [
         {"uid": a.get("uid"), "iban": (a.get("account_id") or {}).get("iban"), "nev": a.get("name") or a.get("details")}
         for a in v.get("accounts", [])
     ]
     return {
         "szemely": szemely,
+        "alkalmazas": alkalmazas,
         "session_id": v.get("session_id"),
         "szamlak": szamlak,
         "valid_until": (v.get("access") or {}).get("valid_until"),

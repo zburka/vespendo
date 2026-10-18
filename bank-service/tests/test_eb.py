@@ -144,3 +144,20 @@ def test_tranzakciotipus_a_nevben_es_a_megjegyzesben():
                              "bank_transaction_code": {"description": "NAPKÖZBENI ÁTUTALÁS", "code": "1"},
                              "remittance_information": ["08. havi munkabér"]})
     assert bevetel["kozlemeny"] == "NAPKÖZBENI ÁTUTALÁS | Feladó: ISOLUTIONS Kft. | Közlemény: 08. havi munkabér"
+
+
+def test_tobb_alkalmazas_state_es_jwt(konfig, tmp_path):
+    kulcs2 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    p2 = tmp_path / "k2.pem"
+    p2.write_bytes(kulcs2.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    konfig.alkalmazasok = {"2": {"app_id": "app-456", "kulcs": str(p2)}}
+    assert konfig.app("alap") is konfig and konfig.app().app_id == "app-123"
+    masik = konfig.app("2")
+    assert masik.app_id == "app-456" and masik.api_kulcs == "titok"
+    assert jwt.get_unverified_header(eb.jwt_token(masik))["kid"] == "app-456"
+    assert jwt.get_unverified_header(eb.jwt_token(konfig))["kid"] == "app-123"
+    s = eb.state_keszit(konfig, "hz_x~feleseg", alkalmazas="2")
+    assert eb.state_adat(konfig, s)["a"] == "2" and eb.state_ellenoriz(konfig, s) == "hz_x~feleseg"
+    assert eb.state_adat(konfig, eb.state_keszit(konfig, "p"))["a"] == "alap"
+    with pytest.raises(eb.BankHiba):
+        konfig.app("nincs")

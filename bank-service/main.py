@@ -22,6 +22,7 @@ def bank_hiba(_, e: eb.BankHiba):
 class AuthKeres(BaseModel):
     szemely: str
     napok: int | None = None
+    alkalmazas: str = "alap"
 
 
 class SessionKeres(BaseModel):
@@ -45,7 +46,7 @@ def ellenorzes(x_api_key: str = Header(default="")):
 @app.post("/auth")
 def auth(k: AuthKeres, x_api_key: str = Header(default="")):
     _jog(x_api_key)
-    return {"status": "success", **eb.auth_inditas(konfig, k.szemely, k.napok)}
+    return {"status": "success", **eb.auth_inditas(konfig, k.szemely, k.napok, alkalmazas=k.alkalmazas)}
 
 
 @app.post("/sessions")
@@ -55,12 +56,13 @@ def sessions(k: SessionKeres, x_api_key: str = Header(default="")):
 
 
 @app.get("/transactions")
-def transactions(uid: str, date_from: str = Query(...), date_to: str | None = None, x_api_key: str = Header(default="")):
+def transactions(uid: str, date_from: str = Query(...), date_to: str | None = None, alkalmazas: str = "alap",
+                 x_api_key: str = Header(default="")):
     _jog(x_api_key)
-    return {"status": "success", **eb.tranzakciok(konfig, uid, date_from, date_to)}
+    return {"status": "success", **eb.tranzakciok(konfig.app(alkalmazas), uid, date_from, date_to)}
 
 
 @app.get("/balances")
-def balances(uid: str, x_api_key: str = Header(default="")):
+def balances(uid: str, alkalmazas: str = "alap", x_api_key: str = Header(default="")):
     _jog(x_api_key)
-    return {"status": "success", "balances": eb.egyenleg(konfig, uid)}
+    return {"status": "success", "balances": eb.egyenleg(konfig.app(alkalmazas), uid)}
