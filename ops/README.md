@@ -22,14 +22,15 @@ python3 wf_szerkesztok.py       # POST /webhook/elofizetes-mentes, /elofizetes-t
 python3 wf_bank.py              # banki összekötés: bank-osszekotes, bank-callback, bank-szinkron, bank-allapot + napi ütemező (BANK_URL felülírható)
 ```
 
-A webhookok `X-App-Key` fejlécet várnak. A Haiku / Sonnet lépések akkor épülnek be, ha az n8n-ben létezik a
+A webhookok az `X-App-Key` fejlécet (a belépési kapu belső kulcsa) és a kapu által beállított `X-Haztartas` / `X-Szemely` fejlécet várnak; kívülről csak a bank-visszahívás érhető el (NPM). Új háztartás-szűrős workflow-k párhuzamos kiadásához: `N8N_UT_ELOTAG=h-` (útvonal-előtag), a `teszt_haztartas.py` az izolációt ellenőrzi. A Haiku / Sonnet lépések akkor épülnek be, ha az n8n-ben létezik a
 `VeSpendo Anthropic (x-api-key)` hitelesítő (és szerepel az `n8n_cred.json`-ban), majd a workflow scriptek újra lefutnak.
 A parser konténer: `docker run -d --name vespendo-parser --network cloudoptima-net -e PARSER_API_KEY=... vespendo-parser`.
 
-## Az app és a kulcs
-Az app alapból az élő szerverhez (`https://n8n.cloudoptima.hu`) csatlakozik. Első indításkor bekéri az alkalmazás kulcsát
-(`VESPENDO_APP_KEY`), és a telefon biztonságos tárolójába menti (iOS Keychain), nincs szükség `.env` fájlra.
-Hibás kulcsnál újra bekéri. Szerver nélküli fejlesztéshez: `EXPO_PUBLIC_MOCK=1`.
+## Az app és a belépés
+Az app a belépési kapuhoz (`https://vespendo.cloudoptima.hu/api/…`, konténer: `vespendo-auth`, forrás: `auth-service/`) csatlakozik,
+felhasználónév (e-mail) és jelszó alapján. Új háztartást a regisztrációs kóddal (`REGISZTRACIOS_KOD` a `/root/.vespendo-auth.env`
+fájlban) lehet létrehozni, meglévőhöz meghívókóddal csatlakozni. A kapu építése/indítása: `ops/auth_deploy.sh`. A háztartások
+adatai a Baserow `haztartas` mezőjével különülnek el. Szerver nélküli fejlesztéshez: `EXPO_PUBLIC_MOCK=1`.
 
 ## Besorolás és tanulás
 Az ismeretlen kereskedőket a Claude Haiku sorolja be (`prompts.py`: közös utasítás, sorszám-kulcsos JSON válasz, teljességi
@@ -50,8 +51,8 @@ tételek nem változnak. Új személy a `szemely-mentes` végponttal (az app Be�
 Az import a tulajdonost mindig a feltöltőre állítja (a szabályok alapértelmezett tulajdonosa üres, hacsak nem adtad meg).
 
 ## Webes (PWA) változat
-A telefonon a Safariból "Főképernyőre" adható webalkalmazás. A statikus csomagot egy nginx konténer szolgálja ki, a `/webhook/`
-hívásokat az n8n-hez továbbítja (ugyanarról az eredetről, nincs CORS). Telepítés / frissítés: `ops/web_deploy.sh`
+A telefonon a Safariból "Főképernyőre" adható webalkalmazás. A statikus csomagot egy nginx konténer szolgálja ki, az `/api/`
+hívásokat a belépési kapuhoz továbbítja (ugyanarról az eredetről, nincs CORS). Telepítés / frissítés: `ops/web_deploy.sh`
 (build és a kiszolgált mappa cseréje, a konténert nem kell újraindítani; a felhasználók a következő megnyitáskor az új verziót kapják).
 ```bash
 docker run -d --name vespendo-web --network cloudoptima-net --restart unless-stopped \
