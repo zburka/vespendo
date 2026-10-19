@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import biztonsag as b
+from . import levelezes
 from .baserow import BaserowKliens
 from .beallitasok import Beallitasok
 from .biztonsag import HibaKod
@@ -258,3 +259,28 @@ class Kapu:
     def api_token_torol(self, felh_id: int, token_id: int) -> None:
         with self.db.kapcsolat() as c:
             c.execute("delete from api_tokenek where id=? and felhasznalo_id=?", (token_id, felh_id))
+
+    # ------------------------------------------------------------ ötletek (visszajelzés)
+    def otlet(self, ctx: dict, szoveg: str) -> dict:
+        """Az ötlet előbb a Baserow-ba kerül (nem veszhet el), utána e-mailben értesítjük a fejlesztőt."""
+        szoveg = (szoveg or "").strip()
+        if len(szoveg) < 5:
+            raise HibaKod("Írj le legalább néhány szót az ötletről.")
+        if len(szoveg) > 2000:
+            raise HibaKod("Az ötlet legfeljebb 2000 karakter lehet.")
+        with self.db.kapcsolat() as c:
+            self._korlat(c, f"otlet:{ctx['felhasznalo_id']}", 5, 3600, "Túl sok ötletet küldtél, próbáld később.")
+            self._proba(c, f"otlet:{ctx['felhasznalo_id']}")
+            f = c.execute("select nev, email from felhasznalok where id=?", (ctx["felhasznalo_id"],)).fetchone()
+            h = c.execute("select nev from haztartasok where id=?", (ctx["haztartas"],)).fetchone()
+        ido = _most()
+        sor = self.baserow.sorok_letrehoz("otletek", [{"felhasznalo": f["nev"], "email": f["email"], "szoveg": szoveg, "ido": ido,
+                                                      "haztartas": ctx["haztartas"], "emailben": False}])[0]
+        elment = levelezes.kuld(self.cfg, f"VeSpendo ötlet – {f['nev']}",
+                                f"{szoveg}\n\n---\nKüldte: {f['nev']} <{f['email']}>\nHáztartás: {h['nev']} ({ctx['haztartas']})\nIdő: {ido}\n", f["email"])
+        if elment:
+            try:
+                self.baserow.sor_modosit("otletek", sor["id"], {"emailben": True})
+            except HibaKod:
+                pass
+        return {"ok": True, "emailben": elment}

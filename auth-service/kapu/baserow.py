@@ -35,6 +35,10 @@ class BaserowKliens:
             ki += self._kerj("POST", f"/api/database/rows/table/{tid}/batch/?user_field_names=true", json={"items": sorok[i:i + 200]})["items"]
         return ki
 
+    def sor_modosit(self, tabla: str, sor_id: int, adat: dict) -> None:
+        tid = self.cfg.baserow_tablak[tabla]
+        self._kerj("PATCH", f"/api/database/rows/table/{tid}/{sor_id}/?user_field_names=true", json=adat)
+
     def sorok(self, tabla: str, haztartas: str) -> list[dict]:
         tid = self.cfg.baserow_tablak[tabla]
         ki, ut = [], f"/api/database/rows/table/{tid}/?user_field_names=true&size=200&filter__haztartas__equal={haztartas}"

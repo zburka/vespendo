@@ -16,6 +16,13 @@ class HamisBaserow:
         self.letrehozva.append(hz)
         return nev.lower()
 
+    def sorok_letrehoz(self, tabla, sorok):
+        self.otletek = getattr(self, "otletek", []) + sorok
+        return [{"id": len(self.otletek), **s} for s in sorok]
+
+    def sor_modosit(self, tabla, sor_id, adat):
+        self.modositva = (tabla, sor_id, adat)
+
     def szemely_letezik(self, hz, kulcs):
         return kulcs in ("anna", "bela")
 
@@ -189,3 +196,33 @@ def test_demo_irasi_korlat(tmp_path):
     h = {"Authorization": "Bearer " + c.post("/api/auth/demo").json()["access_token"]}
     kodok = [c.post("/api/v/cel-mentes", content=b"{}", headers=h).status_code for _ in range(122)]
     assert kodok[:120] == [200] * 120 and kodok[120] == 429
+
+
+def test_otlet_tarolas_email_es_korlat(kozeg, monkeypatch):
+    c, _, bs = kozeg
+    kuldottek = []
+    monkeypatch.setattr("kapu.levelezes.kuld", lambda cfg, targy, szoveg, valasz="": kuldottek.append((targy, szoveg, valasz)) or True)
+    a = reg(c, "a@x.hu", regisztracios_kod="mesterkod")
+    assert c.post("/api/auth/otlet", json={"szoveg": "x"}, headers=fej(a)).status_code == 400
+    assert c.post("/api/auth/otlet", json={"szoveg": "a" * 2001}, headers=fej(a)).status_code == 400
+    assert c.post("/api/auth/otlet", json={"szoveg": "Legyen sötét téma"}).status_code == 401
+    r = c.post("/api/auth/otlet", json={"szoveg": "Legyen sötét téma"}, headers=fej(a))
+    assert r.status_code == 200 and r.json() == {"ok": True, "emailben": True}
+    assert bs.otletek[0]["szoveg"] == "Legyen sötét téma" and bs.otletek[0]["email"] == "a@x.hu"
+    assert "Legyen sötét téma" in kuldottek[0][1] and kuldottek[0][2] == "a@x.hu" and bs.modositva[2] == {"emailben": True}
+    for _ in range(4):
+        assert c.post("/api/auth/otlet", json={"szoveg": "Még egy ötlet"}, headers=fej(a)).status_code == 200
+    assert c.post("/api/auth/otlet", json={"szoveg": "Hatodik ötlet"}, headers=fej(a)).status_code == 429
+
+
+def test_otlet_email_nelkul_is_tarolodik(kozeg):
+    c, _, bs = kozeg   # nincs SMTP beállítva
+    a = reg(c, "a@x.hu", regisztracios_kod="mesterkod")
+    r = c.post("/api/auth/otlet", json={"szoveg": "Jó lenne exportálni"}, headers=fej(a))
+    assert r.status_code == 200 and r.json()["emailben"] is False and len(bs.otletek) == 1
+
+
+def test_otlet_fejlec_injekcio_ellen():
+    from kapu import levelezes
+    cfg = Beallitasok(smtp_host="", smtp_felado="a@b.hu")
+    assert levelezes.kuld(cfg, "x\r\nBcc: y@z.hu", "s", "q@w.hu") is False

@@ -65,6 +65,9 @@ def alkalmazas(cfg: Beallitasok | None = None, baserow=None, tovabbito=None) -> 
     class Szemely(BaseModel):
         kulcs: str
 
+    class Otlet(BaseModel):
+        szoveg: str
+
     class TokenNev(BaseModel):
         nev: str = ""
 
@@ -116,6 +119,10 @@ def alkalmazas(cfg: Beallitasok | None = None, baserow=None, tovabbito=None) -> 
     def eltavolit(tag_id: int, c: dict = Depends(nem_demo)):
         kapu.tag_eltavolit(c, tag_id)
         return {"ok": True}
+
+    @app.post("/api/auth/otlet")
+    def otlet(b: Otlet, c: dict = Depends(nem_demo)):
+        return kapu.otlet(c, b.szoveg)
 
     @app.get("/api/auth/api-tokenek")
     def tokenek(c: dict = Depends(csak_ember)):

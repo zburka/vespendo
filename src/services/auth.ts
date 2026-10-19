@@ -193,6 +193,8 @@ export const ujMeghivokod = async () =>
 export const tagJelszoVisszaallitas = async (id: number) =>
   (await hitelesitett<{ ideiglenes_jelszo: string }>('POST', `/api/auth/tagok/${id}/jelszo-visszaallitas`)).ideiglenes_jelszo;
 export const tagEltavolit = (id: number) => hitelesitett<{ ok: boolean }>('DELETE', `/api/auth/tagok/${id}`);
+export const otletKuldes = (szoveg: string) =>
+  hitelesitett<{ ok: boolean; emailben: boolean }>('POST', '/api/auth/otlet', { szoveg });
 export const apiTokenek = () => hitelesitett<ApiToken[]>('GET', '/api/auth/api-tokenek');
 export const apiTokenLetrehoz = (nev: string) =>
   hitelesitett<{ id: number; nev: string; token: string }>('POST', '/api/auth/api-tokenek', { nev });

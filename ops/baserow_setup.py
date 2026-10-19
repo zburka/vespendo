@@ -104,6 +104,14 @@ mezo(ce, 'aktualis_osszeg', 'number', **SZAM)
 for _t in (kat, tr, sz, sem, bk, kk, ef, ce):
     mezo(_t, 'haztartas', 'text')
 
+# --- felhasználói ötletek (visszajelzés): az app Súgó oldaláról érkeznek, az e-mail mellett itt is megmaradnak
+ot = tabla('otletek', 'felhasznalo')
+mezo(ot, 'szoveg', 'long_text')
+mezo(ot, 'email', 'text')
+mezo(ot, 'ido', 'text')
+mezo(ot, 'emailben', 'boolean')   # sikerült-e e-mailben értesíteni
+mezo(ot, 'haztartas', 'text')
+
 # --- induló adatok (csak üres táblába)
 def ures(tid):
     return api('GET', f'/api/database/rows/table/{tid}/?size=1')['count'] == 0

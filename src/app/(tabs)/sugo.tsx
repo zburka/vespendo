@@ -1,5 +1,10 @@
+import { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
-import { Card, List, Text } from 'react-native-paper';
+import { Button, Card, List, Text, TextInput } from 'react-native-paper';
+
+import { ELO_API } from '../../services/api';
+import { otletKuldes } from '../../services/auth';
+import { Alert } from '../../utils/uzenet';
 
 interface Resz {
   cim: string;
@@ -71,6 +76,21 @@ const RESZEK: Resz[] = [
 
 /** Súgó: mire jó az alkalmazás és hogyan használható (a felhasználóknak szóló leírás). */
 export default function SugoScreen() {
+  const [otlet, setOtlet] = useState('');
+  const [kuldes, setKuldes] = useState(false);
+
+  const kuld = async () => {
+    setKuldes(true);
+    try {
+      await otletKuldes(otlet.trim());
+      setOtlet('');
+      Alert.alert('Köszönjük!', 'Az ötletedet megkaptuk.');
+    } catch (e) {
+      Alert.alert('Ötlet', e instanceof Error ? e.message : 'A küldés nem sikerült.');
+    }
+    setKuldes(false);
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Card>
@@ -97,6 +117,29 @@ export default function SugoScreen() {
           </List.Accordion>
         ))}
       </Card>
+
+      {ELO_API && (
+        <Card>
+          <Card.Title title="Ötleted van?" subtitle="Írd le, mit hiányolsz, vagy mit lehetne jobban csinálni" />
+          <Card.Content style={styles.szoveg}>
+            <TextInput
+              mode="outlined"
+              label="Az ötleted"
+              value={otlet}
+              onChangeText={setOtlet}
+              multiline
+              numberOfLines={5}
+              maxLength={2000}
+            />
+            <Text variant="bodySmall">Az ötletet a fejlesztő e-mailben megkapja, a neveddel és az e-mail címeddel együtt, hogy válaszolhasson.</Text>
+          </Card.Content>
+          <Card.Actions>
+            <Button icon="send" onPress={kuld} loading={kuldes} disabled={kuldes || otlet.trim().length < 5}>
+              Küldés
+            </Button>
+          </Card.Actions>
+        </Card>
+      )}
     </ScrollView>
   );
 }
