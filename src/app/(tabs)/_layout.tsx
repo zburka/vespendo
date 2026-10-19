@@ -54,6 +54,15 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="sugo"
+          options={{
+            title: 'Súgó',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="help-circle" size={size} color={color as string} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="beallitasok"
           options={{
             title: 'Beállítások',
