@@ -142,11 +142,11 @@ return [{ json: { status: 'success', kapcsolatok: el.map((e, i) => ({ szemely: e
 """
 nodes = [
     webhook('Webhook', 'bank-szinkron', 'POST', (0, 0)),
-    http('Kapcsolatok', 'GET', f"={BR}{TK}/?user_field_names=true&size=200" + HZ_VAGY_MIND, (240, 0), creds=cred_baserow(), lapozas=True),
+    http('Kapcsolatok', 'GET', f"={BR}{TK}/?user_field_names=true&size=200" + HZ_VAGY_MIND, (240, 0), creds=cred_baserow(), lapozas=True, retry=True),
     code('Aktív kapcsolatok', AKTIV, (480, 0)),
     if_('Nincs kapcsolat?', '={{ $json.nincs }}', '', IGAZ, (720, 0)),
     respond('Üres válasz', "={{ { status: 'success', kapcsolatok: [], megjegyzes: 'Nincs aktív banki kapcsolat.' } }}", (960, -120)),
-    http('Bank /transactions', 'GET', f"={BANK_URL}/transactions?uid=" + "{{ $json.uid }}&alkalmazas={{ $json.alkalmazas }}&date_from={{ $json.date_from }}", (960, 120), creds=BANK, teljes=True),
+    http('Bank /transactions', 'GET', f"={BANK_URL}/transactions?uid=" + "{{ $json.uid }}&alkalmazas={{ $json.alkalmazas }}&date_from={{ $json.date_from }}", (960, 120), creds=BANK, teljes=True, retry=True),
     code('Import előkészítés', IMPORT_ELO, (1200, 120)),
     http('Banki import', 'POST', f'http://localhost:5678/webhook/{UT_ELOTAG}banki-import', (1440, 120),
          body='={{ JSON.stringify({ feltolto: $json.szemely, tranzakciok: $json.tranzakciok }) }}', creds=APPKULCS, never_error=True,
@@ -165,7 +165,7 @@ for a, b in [('Bank /transactions', 'Import előkészítés'), ('Import előkés
 telepit('VeSpendo – Bank szinkron', nodes, k, hz_csillag=True)
 
 # ütemező: naponta reggel hívja a szinkront
-ut = node('Naponta', 'n8n-nodes-base.scheduleTrigger', 1.2, {'rule': {'interval': [{'field': 'cronExpression', 'expression': '15 6 * * *'}]}}, (0, 0))
+ut = node('Naponta', 'n8n-nodes-base.scheduleTrigger', 1.2, {'rule': {'interval': [{'field': 'cronExpression', 'expression': '15 6 * * *'}, {'field': 'cronExpression', 'expression': '15 14 * * *'}]}}, (0, 0))
 h = http('Szinkron hívása', 'POST', f'http://localhost:5678/webhook/{UT_ELOTAG}bank-szinkron', (260, 0), body='={{ JSON.stringify({}) }}', creds=APPKULCS, never_error=True,
          fejlec={'X-Haztartas': '*'})  # az ütemező minden háztartás kapcsolatát szinkronizálja
 k = {}; osszekot(k, 'Naponta', 'Szinkron hívása')
