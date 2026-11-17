@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { SectionList, StyleSheet, View } from 'react-native';
-import { Chip, Divider, List, Text, useTheme } from 'react-native-paper';
+import { Chip, Divider, List, Searchbar, Text, useTheme } from 'react-native-paper';
 
 import { AdatAllapot } from '../../components/AdatAllapot';
 import { HonapValaszto } from '../../components/HonapValaszto';
@@ -12,6 +12,7 @@ import { useStore } from '../../store/useStore';
 import type { Tranzakcio } from '../../types';
 import { formatFt, formatNap } from '../../utils/format';
 import { azonnaliTetel, devizaInfo, megjelenitettNev } from '../../utils/kereskedo';
+import { egyezik, keresoSzavak } from '../../utils/kereses';
 import { szemelyNev } from '../../utils/szemely';
 
 export default function TranzakciokScreen() {
@@ -28,27 +29,52 @@ export default function TranzakciokScreen() {
   const toltes = useStore((s) => s.toltes);
   const betoltes = useStore((s) => s.betoltes);
 
-  const szekciok = useMemo(() => {
+  // keresés a tétel nevében és megjegyzésében (pl. „anya maszek”); keresés közben az összes hónapban keres
+  const [kerdes, setKerdes] = useState('');
+  const szavak = useMemo(() => keresoSzavak(kerdes), [kerdes]);
+  const keres = szavak.length > 0;
+
+  const { szekciok, talalat } = useMemo(() => {
     const lista = tranzakciok
       .filter(
         (t) =>
-          t.datum.startsWith(honap) &&
+          (keres || t.datum.startsWith(honap)) &&
           (szuro === 'mind' || t.tulajdonos === szuro) &&
-          (!kategoriaSzuro || t.kategoria_id === kategoriaSzuro),
+          (!kategoriaSzuro || t.kategoria_id === kategoriaSzuro) &&
+          egyezik(t, szavak),
       )
       .sort((a, b) => b.datum.localeCompare(a.datum));
     const csoportok = new Map<string, Tranzakcio[]>();
     for (const t of lista) csoportok.set(t.datum, [...(csoportok.get(t.datum) ?? []), t]);
-    return [...csoportok].map(([datum, data]) => ({ title: formatNap(datum), data }));
-  }, [tranzakciok, honap, szuro, kategoriaSzuro]);
+    const kiadas = lista.filter((t) => t.tipus === 'kiadas').reduce((s, t) => s + t.osszeg, 0);
+    const bevetel = lista.filter((t) => t.tipus !== 'kiadas').reduce((s, t) => s + t.osszeg, 0);
+    return {
+      szekciok: [...csoportok].map(([datum, data]) => ({ title: formatNap(datum), data })),
+      talalat: { db: lista.length, kiadas, bevetel },
+    };
+  }, [tranzakciok, honap, szuro, kategoriaSzuro, szavak, keres]);
   const szuroKategoria = kategoriak.find((k) => k.id === kategoriaSzuro);
 
   return (
     <View style={styles.container}>
       <View style={styles.fejlec}>
-        <HonapValaszto />
+        {!keres && <HonapValaszto />}
         <AdatAllapot />
+        <Searchbar
+          placeholder="Keresés a tételekben (pl. anya maszek)"
+          value={kerdes}
+          onChangeText={setKerdes}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
         <SzemelyValaszto ertek={szuro} onChange={setSzuro} mind />
+        {keres && (
+          <Text variant="bodySmall">
+            {talalat.db} találat az összes hónapban
+            {talalat.kiadas > 0 ? ` · kiadás: ${formatFt(talalat.kiadas)}` : ''}
+            {talalat.bevetel > 0 ? ` · bevétel: ${formatFt(talalat.bevetel)}` : ''}
+          </Text>
+        )}
         {szuroKategoria && (
           <View style={styles.szuroSor}>
             <Chip icon="filter" onClose={() => setKategoriaSzuro(null)}>
@@ -64,7 +90,7 @@ export default function TranzakciokScreen() {
         refreshing={toltes}
         onRefresh={betoltes}
         ItemSeparatorComponent={Divider}
-        ListEmptyComponent={<Text style={styles.ures}>Nincs tétel ebben a hónapban.</Text>}
+        ListEmptyComponent={<Text style={styles.ures}>{keres ? 'Nincs találat.' : 'Nincs tétel ebben a hónapban.'}</Text>}
         renderSectionHeader={({ section }) => (
           <Text
             variant="labelLarge"

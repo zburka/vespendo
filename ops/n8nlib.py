@@ -105,9 +105,41 @@ def hz_kapu(nodes, kapcsolatok, csillag=False):
     kapcsolatok['Háztartás ellenőrzés'] = kapcsolatok.get('Webhook', {'main': [[]]})
     kapcsolatok['Webhook'] = {'main': [[{'node': 'Háztartás ellenőrzés', 'type': 'main', 'index': 0}]]}
 
+# AI-használat mérés: minden Anthropic-hívás után a tokenszám a dashboard központi naplójába kerül
+# (csak számok és címkék, tartalom nem). A docker-hálózat átjárója éri el a hoston futó dashboardot.
+METER_URL = os.environ.get('AI_METER_URL', 'http://172.18.0.1:8088/api/ai-usage/ingest')
+METER_TENANT = ("(() => { try { return String((($('Webhook').first().json.headers) || {})['x-haztartas'] || '-'); } "
+                "catch (e) { return '-'; } })()")
+
+def ai_meres(nodes, kapcsolatok, wf_nev, app='vespendo'):
+    """Minden api.anthropic.com HTTP-csomópont mellé mellékágat tesz, ami a válasz `usage` mezőjét jelenti a dashboardnak.
+    A mellékág hibája nem érinti a workflow-t (neverError + onError continue); a fő adatfolyam nem változik."""
+    if 'AI Usage Meter' not in CRED:
+        return
+    for n in list(nodes):
+        if n['type'] != 'n8n-nodes-base.httpRequest' or 'api.anthropic.com' not in str(n['parameters'].get('url', '')):
+            continue
+        nev = 'Mérés – ' + n['name']
+        if any(x['name'] == nev for x in nodes):
+            continue
+        body = ("={{ JSON.stringify({ app: " + json.dumps(app) + ", tenant: " + METER_TENANT + ", workflow: " + json.dumps(wf_nev, ensure_ascii=False) +
+                ", purpose: " + json.dumps(n['name'], ensure_ascii=False) + ", provider: 'anthropic', model: $json.model || 'ismeretlen', "
+                "input_tokens: $json.usage?.input_tokens || 0, output_tokens: $json.usage?.output_tokens || 0, "
+                "cache_read: $json.usage?.cache_read_input_tokens || 0, cache_write: $json.usage?.cache_creation_input_tokens || 0 }) }}")
+        m = http(nev, 'POST', METER_URL, (n['position'][0] + 240, n['position'][1] + 220), body=body, never_error=True,
+                 creds={'httpHeaderAuth': {'id': CRED['AI Usage Meter'], 'name': 'AI Usage Meter'}})
+        m['parameters']['options']['timeout'] = 5000
+        m['onError'] = 'continueRegularOutput'
+        nodes.append(m)
+        ag = kapcsolatok.setdefault(n['name'], {'main': [[]]})
+        if not ag.get('main'):
+            ag['main'] = [[]]
+        ag['main'][0].append({'node': nev, 'type': 'main', 'index': 0})
+
 def telepit(nev, nodes, kapcsolatok, beallitasok=None, hz_csillag=False):
     nev = nev + NEV_UTOTAG
     hz_kapu(nodes, kapcsolatok, hz_csillag)
+    ai_meres(nodes, kapcsolatok, nev)
     wf = {'name': nev, 'nodes': nodes, 'connections': kapcsolatok, 'settings': {
         'executionOrder': 'v1', 'saveDataSuccessExecution': 'none', 'saveDataErrorExecution': 'all', 'saveManualExecutions': False,
         'saveExecutionProgress': False, **(beallitasok or {})}}

@@ -164,8 +164,8 @@ for a, b in [('Bank /transactions', 'Import előkészítés'), ('Import előkés
              ('Utolsó szinkron mentése', 'Összegzés'), ('Összegzés', 'Válasz')]: osszekot(k, a, b)
 telepit('VeSpendo – Bank szinkron', nodes, k, hz_csillag=True)
 
-# ütemező: naponta reggel hívja a szinkront
-ut = node('Naponta', 'n8n-nodes-base.scheduleTrigger', 1.2, {'rule': {'interval': [{'field': 'cronExpression', 'expression': '15 6 * * *'}, {'field': 'cronExpression', 'expression': '15 14 * * *'}]}}, (0, 0))
+# ütemező: minden éjszaka (03:15, magyar idő) egyszer hívja a szinkront
+ut = node('Naponta', 'n8n-nodes-base.scheduleTrigger', 1.2, {'rule': {'interval': [{'field': 'cronExpression', 'expression': '15 3 * * *'}]}}, (0, 0))
 h = http('Szinkron hívása', 'POST', f'http://localhost:5678/webhook/{UT_ELOTAG}bank-szinkron', (260, 0), body='={{ JSON.stringify({}) }}', creds=APPKULCS, never_error=True,
          fejlec={'X-Haztartas': '*'})  # az ütemező minden háztartás kapcsolatát szinkronizálja
 k = {}; osszekot(k, 'Naponta', 'Szinkron hívása')

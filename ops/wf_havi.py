@@ -39,24 +39,38 @@ const honap_allapot = folyamatban
   : { allapot: honap > ma.slice(0, 7) ? 'jovobeli' : 'lezart', osszes_nap: napokOssz };
 const adat = { honap, honap_allapot, bevetel: Math.round(osszes_bevetel), kiadas: Math.round(osszes_kiadas), egyenleg: Math.round(osszes_bevetel - osszes_kiadas), legnagyobb_kiadasok: top,
   keretek: keretek.map(k => ({ kategoria: k.kategoria, keret: k.havi_keret, elkoltve: Math.round(k.elkoltve), szazalek: k.szazalek })), megtakaritasi_celok: cel };
-const lenyomat = JSON.stringify(adat);
+// Az AI-elemzést csak érdemi változásnál futtatjuk újra: a folyamatban lévő hónapnál az ujjlenyomat durvított
+// (összegek 5 ezerre, keret-százalékok 10-esre kerekítve, a nap 3 napos blokkokban), és legfeljebb 12 óránként frissül.
+// A lezárt hónap pontos ujjlenyomattal kerül tárolásra, az egyszer elkészült elemzés nem fut újra.
+const kerek = (n, m) => Math.round((Number(n) || 0) / m) * m;
+const exact = JSON.stringify(adat);
+const lenyomat = folyamatban ? JSON.stringify({
+  honap, nap_blokk: Math.floor(honap_allapot.eltelt_napok / 3), bevetel: kerek(osszes_bevetel, 5000), kiadas: kerek(osszes_kiadas, 5000),
+  top: top.map(t => [t.nev, kerek(t.osszeg, 5000)]), keretek: keretek.map(k => [k.kategoria, kerek(k.szazalek, 10)]),
+  celok: cel.map(c => [c.nev, kerek(c.jelenleg, 10000)]) }) : exact;
 const statik = $getWorkflowStaticData('global');
 statik.ai = statik.ai || {};
 const aikulcs = HZ + '|' + honap;
 const tarolt = statik.ai[aikulcs];
-const friss = !!tarolt && tarolt.l === lenyomat;
+const friss = !!tarolt && (tarolt.l === lenyomat || tarolt.l === exact);  // a régi (pontos) bejegyzések is érvényesek maradnak
+const korlatozott = !!tarolt && !!tarolt.ts && folyamatban && (Date.now() - tarolt.ts) < 12 * 3600 * 1000;
+const van_szoveg = friss || korlatozott;
 return [{ json: {
-  kell_ai: tr.length > 0 && !friss, lenyomat, ai_adat: adat, honap, aikulcs,
+  kell_ai: tr.length > 0 && !van_szoveg, lenyomat, ai_adat: adat, honap, aikulcs,
   osszes_bevetel, osszes_kiadas, egyenleg: osszes_bevetel - osszes_kiadas,
   bontas_szemely_szerint: kiadasok.reduce((m, t) => { m[t.tul] = (m[t.tul] || 0) + t.osszeg; return m; }, {}),
   bontas_tulajdonos_szerint: { kozos: sum(kiadasok.filter(t => t.tul === 'kozos')), ferj_sajat: 0, feleseg_sajat: 0 },
   keretek, elofizetesek,
   varhato_hatralevo_elofizetesek: elofizetesek.filter(e => !e.kifizetve).reduce((s, e) => s + e.varhato_osszeg, 0),
-  ai_elemzes: friss ? tarolt.t : '',
+  ai_elemzes: van_szoveg ? tarolt.t : '',
 } }];
 """
-SONNET_BODY = ("={{ JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 450, thinking: { type: 'between_tools' }, "
-  "system: 'Családi pénzügyi tanácsadó vagy. A kapott havi adatok alapján írj 3-4 mondatos, barátságos, konkrét magyar nyelvű elemzést. "
+# A havi elemzés modellje. Mért: Haiku 5.5 a tömör utasítással a Sonnetével egyenértékű szöveget ír, olcsóbban.
+# Sonnetre visszaváltás: HAVI_MODELL = 'claude-sonnet-5-5', HAVI_THINKING = 'between_tools' (a Sonnet nem fogadja el a 'disabled'-et).
+HAVI_MODELL = 'claude-haiku-5-5'
+HAVI_THINKING = 'disabled'
+HAVI_BODY = ("={{ JSON.stringify({ model: '" + HAVI_MODELL + "', max_tokens: 600, thinking: { type: '" + HAVI_THINKING + "' }, "
+  "system: 'Családi pénzügyi tanácsadó vagy. A kapott havi adatok alapján írj 3-4 RÖVID mondatos, összesen legfeljebb 450 karakteres, barátságos, konkrét magyar nyelvű elemzést. "
   "Az adat honap_allapot mezője megmondja, hol tart a hónap. Ha az allapot lezart: visszatekintő összegzés (mi alakult jól, mi okozott gondot) és egy tanács a következő hónapra. "
   "Ha az allapot folyamatban: a hónap MÉG TART, ezért ne írj úgy, mintha vége lenne, és ne zárd le. Mondd meg, hol tartanak az eltelt napok alapján, "
   "egyszerű arányosítással hogyan alakulhat a hónap vége (óvatosan: ha a kiadás néhány nagy, egyszeri tételből áll, jelezd, hogy a napi tempó félrevezető lehet, és ne ijesztgess vele), mire figyeljenek a hátralévő napokban (különösen a költségkeretekhez közeli vagy túllépett kategóriáknál), "
@@ -67,7 +81,7 @@ MENTES = r"""
 const e = $('Számítás').first().json;
 const szoveg = (($input.first().json.content || []).find(b => b.type === 'text') || {}).text;
 const ai = (szoveg || '').trim();
-if (ai) { const statik = $getWorkflowStaticData('global'); statik.ai = statik.ai || {}; statik.ai[e.aikulcs] = { l: e.lenyomat, t: ai }; }
+if (ai) { const statik = $getWorkflowStaticData('global'); statik.ai = statik.ai || {}; statik.ai[e.aikulcs] = { l: e.lenyomat, t: ai, ts: Date.now() }; }
 return [{ json: { ...e, ai_elemzes: ai || e.ai_elemzes } }];
 """
 def lista(nev, tabla, poz, plusz=''):
@@ -83,7 +97,7 @@ nodes = [
     lista('Célok', 'megtakaritasi_celok', (1300, 0)),
     code('Számítás', SZAMOL, (1560, 0)),
     if_('Kell AI elemzés?', '={{ $json.kell_ai }}', '', {'type': 'boolean', 'operation': 'true', 'singleValue': True}, (1800, 0)),
-    http('Sonnet elemzés', 'POST', 'https://api.anthropic.com/v1/messages', (2040, -120), body=SONNET_BODY,
+    http('AI elemzés', 'POST', 'https://api.anthropic.com/v1/messages', (2040, -120), body=HAVI_BODY,
          creds={'httpHeaderAuth': {'id': CRED['VeSpendo Anthropic (x-api-key)'], 'name': 'VeSpendo Anthropic (x-api-key)'}},
          fejlec={'anthropic-version': '2023-06-01'}, never_error=True, retry=True),
     code('Mentés', MENTES, (2280, -120)),
@@ -92,6 +106,6 @@ nodes = [
 k = {}
 lanc = ['Webhook', 'Tranzakciók', 'Keretek', 'Előfizetések', 'Kategóriák', 'Célok', 'Számítás', 'Kell AI elemzés?']
 for a, b in zip(lanc, lanc[1:]): osszekot(k, a, b)
-osszekot(k, 'Kell AI elemzés?', 'Sonnet elemzés', 0); osszekot(k, 'Kell AI elemzés?', 'Válasz', 1)
-osszekot(k, 'Sonnet elemzés', 'Mentés'); osszekot(k, 'Mentés', 'Válasz')
+osszekot(k, 'Kell AI elemzés?', 'AI elemzés', 0); osszekot(k, 'Kell AI elemzés?', 'Válasz', 1)
+osszekot(k, 'AI elemzés', 'Mentés'); osszekot(k, 'Mentés', 'Válasz')
 telepit('VeSpendo – Havi összesítő', nodes, k)
